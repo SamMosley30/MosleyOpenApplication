@@ -1,0 +1,21 @@
+{
+    "files.associations": {
+        "qstring": "cpp",
+        "qmainwindow": "cpp",
+        "qapplication": "cpp",
+        "xlocmes": "cpp",
+        "new": "cpp",
+        "qpushbutton": "cpp",
+        "array": "cpp",
+        "deque": "cpp",
+        "map": "cpp",
+        "unordered_map": "cpp",
+        "vector": "cpp",
+        "xstring": "cpp",
+        "string_view": "cpp",
+        "qtwidgets": "cpp",
+        "chrono": "cpp",
+        "variant": "cpp",
+        "span": "cpp"
+    }
+}

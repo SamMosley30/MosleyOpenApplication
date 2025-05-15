@@ -1,0 +1,19 @@
+{
+    "version": 8,
+    "configurePresets": [
+        {
+            "name": "Qt 6.9.0 MinGW 64-bit Preset",
+            "displayName": "Qt 6.9.0 MinGW 64-bit Preset",
+            "description": "Using compilers from Qt's bundled MinGW",
+            "generator": "MinGW Makefiles",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/gcc.exe",
+                "CMAKE_CXX_COMPILER": "C:/Qt/Tools/mingw1310_64/bin/g++.exe",
+                "Qt6_DIR": "C:/Qt/6.9.0/mingw_64/lib/cmake/Qt6"
+            }
+        }
+    ]
+}
