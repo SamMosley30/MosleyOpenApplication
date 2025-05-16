@@ -33,6 +33,10 @@ qt_add_executable(MosleyOpen
     DailyLeaderboardModel.cpp
     DailyLeaderboardWidget.h
     DailyLeaderboardWidget.cpp
+    TeamLeaderboardModel.h
+    TeamLeaderboardModel.cpp
+    TeamLeaderboardWidget.h
+    TeamLeaderboardWidget.cpp
     TeamAssemblyDialog.h
     TeamAssemblyDialog.cpp
     PlayerListWidget.h

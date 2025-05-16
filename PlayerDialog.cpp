@@ -4,8 +4,6 @@
 #include <QtWidgets>
 #include <QtSql>
 
-import <vector>
-
 PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
     : QDialog(parent)
     , model(new QSqlTableModel(this, db))

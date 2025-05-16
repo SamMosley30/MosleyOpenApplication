@@ -11,8 +11,7 @@
 // Include the new custom widget headers
 #include "tournamentleaderboardwidget.h"
 #include "dailyleaderboardwidget.h"
-// Forward declare other leaderboard widgets we will create
-//class TeamLeaderboardWidget;
+#include "TeamLeaderboardWidget.h"
 
 // Include QPainter related headers for the export functionality (now in the widget)
 // #include <QPainter>
@@ -51,7 +50,7 @@ private:
     DailyLeaderboardWidget *day1LeaderboardWidget;            // Day 1 widget
     DailyLeaderboardWidget *day2LeaderboardWidget;            // Day 2 widget
     DailyLeaderboardWidget *day3LeaderboardWidget;            // Day 3 widget
-    //TeamLeaderboardWidget *teamLeaderboardWidget;             // Team widget (will be implemented later)
+    TeamLeaderboardWidget *teamLeaderboardWidget;             // Team widget (will be implemented later)
 
     QPushButton *refreshButton; // Button to refresh all leaderboards
     QPushButton *closeButton;   // Button to close the dialog

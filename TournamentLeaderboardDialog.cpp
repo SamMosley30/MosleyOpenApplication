@@ -1,8 +1,8 @@
 #include "tournamentleaderboarddialog.h"
-// Include headers for the new custom widgets (Daily and Team widgets will be created)
+// Include headers for the new custom widgets
 #include "tournamentleaderboardwidget.h"
 #include "dailyleaderboardwidget.h"
-//#include "teamleaderboardwidget.h" // Include header for TeamLeaderboardWidget (will create)
+#include "teamleaderboardwidget.h" // Include header for TeamLeaderboardWidget
 
 #include <QSqlDatabase>
 #include <QDebug>
@@ -31,7 +31,7 @@ TournamentLeaderboardDialog::TournamentLeaderboardDialog(const QString &connecti
     , day1LeaderboardWidget(new DailyLeaderboardWidget(m_connectionName, 1, this)) // Pass day number 1
     , day2LeaderboardWidget(new DailyLeaderboardWidget(m_connectionName, 2, this)) // Pass day number 2
     , day3LeaderboardWidget(new DailyLeaderboardWidget(m_connectionName, 3, this)) // Pass day number 3
-    //, teamLeaderboardWidget(new TeamLeaderboardWidget(m_connectionName, this))     // Team widget
+    , teamLeaderboardWidget(new TeamLeaderboardWidget(m_connectionName, this))     // Team widget
 
     // Initialize buttons
     , refreshButton(new QPushButton(tr("Refresh All"), this)) // Refresh button refreshes all tabs
@@ -53,7 +53,7 @@ TournamentLeaderboardDialog::TournamentLeaderboardDialog(const QString &connecti
     tabWidget->addTab(day1LeaderboardWidget, tr("Day 1 Leaderboard"));
     tabWidget->addTab(day2LeaderboardWidget, tr("Day 2 Leaderboard"));
     tabWidget->addTab(day3LeaderboardWidget, tr("Day 3 Leaderboard"));
-    //tabWidget->addTab(teamLeaderboardWidget, tr("Team Leaderboard")); // Add team tab
+    tabWidget->addTab(teamLeaderboardWidget, tr("Team Leaderboard")); // Add team tab
 
 
     // --- Setup Layout ---
@@ -124,7 +124,7 @@ void TournamentLeaderboardDialog::refreshLeaderboards()
     day1LeaderboardWidget->refreshData();
     day2LeaderboardWidget->refreshData();
     day3LeaderboardWidget->refreshData();
-    //teamLeaderboardWidget->refreshData(); // Call refresh for team widget (will be implemented)
+    teamLeaderboardWidget->refreshData(); // Call refresh for team widget (will be implemented)
 
     // Column visibility is now handled within the TournamentLeaderboardWidget after its refresh
     // updateDailyLeaderboardColumnVisibility(); // Not needed here anymore
@@ -155,8 +155,8 @@ void TournamentLeaderboardDialog::exportCurrentImage()
         exportedImage = overallWidget->exportToImage();
     } else if (DailyLeaderboardWidget *dailyWidget = qobject_cast<DailyLeaderboardWidget*>(currentWidget)) {
         exportedImage = dailyWidget->exportToImage(); // Call export on daily widget
-    // } else if (TeamLeaderboardWidget *teamWidget = qobject_cast<TeamLeaderboardWidget*>(currentWidget)) {
-    //     exportedImage = teamWidget->exportToImage(); // Call export on team widget (will implement)
+    } else if (TeamLeaderboardWidget *teamWidget = qobject_cast<TeamLeaderboardWidget*>(currentWidget)) {
+        exportedImage = teamWidget->exportToImage(); // Call export on team widget (will implement)
     } else {
         QMessageBox::warning(this, tr("Export Failed"), tr("Cannot export the current tab type."));
         return;
