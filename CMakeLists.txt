@@ -33,6 +33,10 @@ qt_add_executable(MosleyOpen
     DailyLeaderboardModel.cpp
     DailyLeaderboardWidget.h
     DailyLeaderboardWidget.cpp
+    TeamAssemblyDialog.h
+    TeamAssemblyDialog.cpp
+    PlayerListWidget.h
+    PlayerListWidget.cpp
 )
 
 target_link_libraries(MosleyOpen PRIVATE Qt6::Widgets Qt6::Sql)

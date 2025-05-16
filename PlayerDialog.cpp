@@ -4,6 +4,8 @@
 #include <QtWidgets>
 #include <QtSql>
 
+import <vector>
+
 PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
     : QDialog(parent)
     , model(new QSqlTableModel(this, db))
@@ -22,6 +24,7 @@ PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
 
     tableView->setModel(model);
     tableView->hideColumn(0);
+    tableView->hideColumn(4);
     tableView->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     tableView->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     tableView->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);

@@ -3,6 +3,7 @@
 #include "CoursesDialog.h"
 #include "ScoreEntryDialog.h"
 #include "TournamentLeaderboardDialog.h"
+#include "TeamAssemblyDialog.h"
 #include <QtWidgets>
 
 MainWindow::MainWindow(QSqlDatabase &db, QWidget *parent)
@@ -12,6 +13,7 @@ MainWindow::MainWindow(QSqlDatabase &db, QWidget *parent)
     , coursesDialog(new CoursesDialog(db, this))
     , scoreDialog(new ScoreEntryDialog(db.connectionName(), this))
     , tournamentLeaderboardDialog(new TournamentLeaderboardDialog(db.connectionName(), this))
+    , teamAssemblyDialog(new TeamAssemblyDialog(db, this))
 {
     auto *central = new QWidget(this);
     auto *layout = new QVBoxLayout(central);
@@ -19,10 +21,14 @@ MainWindow::MainWindow(QSqlDatabase &db, QWidget *parent)
     auto *coursesButton = new QPushButton(tr("Manage Courses"), central);
     auto *scoreButton = new QPushButton(tr("Manage Scores"), central);
     auto *leaderboardButton = new QPushButton(tr("Tournament Leaderboard"), central);
+    auto *teamAssemblyButton = new QPushButton(tr("Assemble Teams"), central);
+
     layout->addWidget(playersButton);
     layout->addWidget(coursesButton);
     layout->addWidget(scoreButton);
     layout->addWidget(leaderboardButton);
+    layout->addWidget(teamAssemblyButton);
+
     central->setLayout(layout);
     setCentralWidget(central);
 
@@ -37,6 +43,9 @@ MainWindow::MainWindow(QSqlDatabase &db, QWidget *parent)
 
     connect(leaderboardButton, &QPushButton::clicked,
             this, &MainWindow::openLeaderboardDialog);
+
+    connect(teamAssemblyButton, &QPushButton::clicked,
+            this, &MainWindow::openTeamAssemblyDialog);
 
     setWindowTitle(tr("Tournament App"));
     resize(400, 200);
@@ -56,4 +65,8 @@ void MainWindow::openScoreDialog() {
 
 void MainWindow::openLeaderboardDialog() {
     tournamentLeaderboardDialog->exec();
+} 
+
+void MainWindow::openTeamAssemblyDialog() { // Add this function
+    teamAssemblyDialog->exec();
 }

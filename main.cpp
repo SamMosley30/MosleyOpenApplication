@@ -20,9 +20,19 @@ int main(int argc, char *argv[]) {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
         handicap INTEGER NOT NULL DEFAULT 0,
-        active INTEGER NOT NULL DEFAULT 1
+        active INTEGER NOT NULL DEFAULT 1,
+        team_id INTEGER DEFAULT NULL 
     )
     )");
+
+    // Check if the team_id column exists, and add it if it doesn't (for existing databases)
+    QSqlRecord playersRecord = db.record("players");
+    if (playersRecord.indexOf("team_id") == -1) {
+        qDebug() << "Adding team_id column to players table.";
+        if (!q.exec("ALTER TABLE players ADD COLUMN team_id INTEGER DEFAULT NULL")) {
+            qWarning() << "Failed to add team_id column to players table:" << q.lastError().text();
+        }
+    }
 
     // Course tables
     q.exec(R"(
@@ -55,7 +65,7 @@ int main(int argc, char *argv[]) {
         )
       )");
 
-    // Score Table
+    // Settings Table
     q.exec(R"(
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY UNIQUE,
