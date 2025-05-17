@@ -1,20 +1,29 @@
 #include <QApplication>
 #include <QMessageBox>
 #include <QtSql>
+#include <QDebug> // Add this for qDebug
 #include "MainWindow.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
     QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
     QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath() + "/sqldrivers");
-    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE"); // This becomes the default connection
     db.setDatabaseName("tournament.db");
+
+    qDebug() << "main.cpp - Initial DB Connection Name:" << db.connectionName(); // DEBUG
+    qDebug() << "main.cpp - Is default connection:" << (db.connectionName() == QSqlDatabase::defaultConnection); // DEBUG
+
     if (!db.open()) {
         QMessageBox::critical(nullptr, QObject::tr("Database Error"), db.lastError().text());
+        qDebug() << "main.cpp - DB Open FAILED:" << db.lastError().text(); // DEBUG
         return 1;
     }
+    qDebug() << "main.cpp - DB Opened Successfully. Connection Name:" << db.connectionName(); // DEBUG
+
 
     QSqlQuery q(db);
+    // Players table: Added team_id column
     q.exec(R"(
     CREATE TABLE IF NOT EXISTS players (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,12 +34,11 @@ int main(int argc, char *argv[]) {
     )
     )");
 
-    // Check if the team_id column exists, and add it if it doesn't (for existing databases)
     QSqlRecord playersRecord = db.record("players");
     if (playersRecord.indexOf("team_id") == -1) {
-        qDebug() << "Adding team_id column to players table.";
+        qDebug() << "main.cpp - Adding team_id column to players table.";
         if (!q.exec("ALTER TABLE players ADD COLUMN team_id INTEGER DEFAULT NULL")) {
-            qWarning() << "Failed to add team_id column to players table:" << q.lastError().text();
+            qWarning() << "main.cpp - Failed to add team_id column to players table:" << q.lastError().text();
         }
     }
 
@@ -73,7 +81,7 @@ int main(int argc, char *argv[]) {
         )
       )");
 
-    MainWindow w(db);
+    MainWindow w(db); // Pass the QSqlDatabase object itself
     w.show();
     return app.exec();
 }

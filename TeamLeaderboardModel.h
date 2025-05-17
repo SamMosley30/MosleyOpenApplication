@@ -14,13 +14,11 @@
 // Structure to hold calculated data for each team on the leaderboard
 struct TeamLeaderboardRow {
     int teamId;                 // 1, 2, 3, or 4
-    QString teamName;           // e.g., "Team 1"
+    QString teamName;           // e.g., "Team Jake"
     int rank;
     QMap<int, int> dailyTeamStablefordPoints; // Map<DayNum, TotalPointsForTeamOnThatDay>
     int overallTeamStablefordPoints;
-
-    // Optional: Store members for display or detailed drill-down
-    // QVector<PlayerInfo> teamMembers; 
+    QVector<PlayerInfo> teamMembers; // Store players in this team
 };
 
 class TeamLeaderboardModel : public QAbstractTableModel {
@@ -46,7 +44,7 @@ private:
     QSet<int> m_daysWithScores; // Days (1,2,3) that have any scores recorded
 
     // Raw data fetched from DB
-    QMap<int, PlayerInfo> m_allPlayers; // Map<PlayerId, PlayerInfo>
+    QMap<int, PlayerInfo> m_allPlayers; // Map<PlayerId, PlayerInfo> (includes name and handicap)
     QMap<int, int> m_playerTeamAssignments; // Map<PlayerId, TeamId>
     QMap<QPair<int, int>, QPair<int, int>> m_allHoleDetails; // Map<Pair<CourseId, HoleNum>, Pair<Par, Handicap>>
     // Map<PlayerId, Map<DayNum, Map<HoleNum, ScoreInfo(score, course_id)>>>
@@ -54,11 +52,12 @@ private:
 
     // Helper methods
     QSqlDatabase database() const;
-    void fetchAllPlayersAndAssignments();
+    void fetchAllPlayersAndAssignments(); // Will now also help populate teamMembers
     void fetchAllHoleDetails();
     void fetchAllScores();
+    void determineTeamNames(); // New method to set team names based on captain
     void calculateTeamLeaderboard();
-    int calculateStablefordPoints(int grossScore, int par, int playerDatabaseHandicap, int holeHandicapIndex) const;
+    int calculateStablefordPoints(int score, int par) const; // Assuming this is the basic one, not the complex per-player one
 };
 
 #endif // TEAMLEADERBOARDMODEL_H

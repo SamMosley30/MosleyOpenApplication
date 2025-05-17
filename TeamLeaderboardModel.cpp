@@ -1,8 +1,8 @@
 #include "TeamLeaderboardModel.h"
 #include <QSqlQuery>
 #include <QSqlError>
-#include <algorithm> // For std::sort, std::greater
-#include <cmath>     // For std::floor (changed from std::ceil)
+#include <algorithm> // For std::sort, std::greater, std::max_element
+#include <cmath>     // For std::ceil
 
 TeamLeaderboardModel::TeamLeaderboardModel(const QString &connectionName, QObject *parent)
     : QAbstractTableModel(parent), m_connectionName(connectionName) {
@@ -10,7 +10,8 @@ TeamLeaderboardModel::TeamLeaderboardModel(const QString &connectionName, QObjec
     m_leaderboardData.resize(4);
     for (int i = 0; i < 4; ++i) {
         m_leaderboardData[i].teamId = i + 1;
-        m_leaderboardData[i].teamName = QString("Team %1").arg(i + 1);
+        // Initial name, will be overwritten by determineTeamNames()
+        m_leaderboardData[i].teamName = QString("Team %1 (Unassigned)").arg(i + 1); 
         m_leaderboardData[i].overallTeamStablefordPoints = 0;
         m_leaderboardData[i].rank = 0;
     }
@@ -44,9 +45,9 @@ QVariant TeamLeaderboardModel::data(const QModelIndex &index, int role) const {
     if (role == Qt::DisplayRole) {
         switch (index.column()) {
             case 0: return teamRow.rank > 0 ? QVariant(teamRow.rank) : QVariant("-");
-            case 1: return teamRow.teamName;
+            case 1: return teamRow.teamName; // This will now be "Team <Captain>"
             case 2: // Day 1 Points
-                return teamRow.dailyTeamStablefordPoints.value(1, 0); // Default to 0 if no score
+                return teamRow.dailyTeamStablefordPoints.value(1, 0); 
             case 3: // Day 2 Points
                 return teamRow.dailyTeamStablefordPoints.value(2, 0);
             case 4: // Day 3 Points
@@ -55,8 +56,8 @@ QVariant TeamLeaderboardModel::data(const QModelIndex &index, int role) const {
             default: return QVariant();
         }
     } else if (role == Qt::TextAlignmentRole) {
-        if (index.column() == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter); // Team Name
-        return Qt::AlignCenter; // Rank and points
+        if (index.column() == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter); 
+        return QVariant(Qt::AlignCenter); 
     }
     return QVariant();
 }
@@ -75,7 +76,7 @@ QVariant TeamLeaderboardModel::headerData(int section, Qt::Orientation orientati
     }
     if (role == Qt::TextAlignmentRole && orientation == Qt::Horizontal) {
         if (section == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
-        return Qt::AlignCenter;
+        return QVariant(Qt::AlignCenter);
     }
     return QVariant();
 }
@@ -89,17 +90,21 @@ void TeamLeaderboardModel::refreshData() {
     m_allScores.clear();
     m_daysWithScores.clear();
 
-    // Reset team scores before recalculating
     for (TeamLeaderboardRow &teamRow : m_leaderboardData) {
         teamRow.dailyTeamStablefordPoints.clear();
         teamRow.overallTeamStablefordPoints = 0;
         teamRow.rank = 0;
+        teamRow.teamMembers.clear(); // Clear previous members
+        // Reset initial name, determineTeamNames will set it properly
+        teamRow.teamName = QString("Team %1 (No Captain)").arg(teamRow.teamId); 
     }
 
-    fetchAllPlayersAndAssignments();
+    fetchAllPlayersAndAssignments(); // This will populate m_allPlayers and m_playerTeamAssignments
+                                     // And now also populate teamRow.teamMembers
+    determineTeamNames();            // Set team names based on captains
     fetchAllHoleDetails();
     fetchAllScores();
-    calculateTeamLeaderboard();
+    calculateTeamLeaderboard();      // Calculates scores using team members
 
     endResetModel();
     qDebug() << "TeamLeaderboardModel: Data refreshed.";
@@ -121,29 +126,61 @@ void TeamLeaderboardModel::fetchAllPlayersAndAssignments() {
             PlayerInfo player;
             player.id = query.value("id").toInt();
             player.name = query.value("name").toString();
-            player.handicap = query.value("handicap").toInt(); // This is the playerDatabaseHandicap
+            player.handicap = query.value("handicap").toInt(); // This is the "point target"
             m_allPlayers[player.id] = player;
 
             QVariant teamIdVariant = query.value("team_id");
             if (!teamIdVariant.isNull()) {
-                m_playerTeamAssignments[player.id] = teamIdVariant.toInt();
+                int teamId = teamIdVariant.toInt();
+                m_playerTeamAssignments[player.id] = teamId;
+                // Add player to the correct team's member list
+                if (teamId >= 1 && teamId <= m_leaderboardData.size()) {
+                    m_leaderboardData[teamId - 1].teamMembers.append(player);
+                }
             }
         }
         qDebug() << "TeamLeaderboardModel: Fetched" << m_allPlayers.size() << "active players and" << m_playerTeamAssignments.size() << "team assignments.";
+        for(const auto& teamRow : m_leaderboardData) {
+            qDebug() << "Team" << teamRow.teamId << "has" << teamRow.teamMembers.size() << "members initially populated.";
+        }
     } else {
         qDebug() << "TeamLeaderboardModel::fetchAllPlayersAndAssignments: ERROR executing query:" << query.lastError().text();
     }
 }
 
+void TeamLeaderboardModel::determineTeamNames() {
+    for (TeamLeaderboardRow &teamRow : m_leaderboardData) {
+        if (teamRow.teamMembers.isEmpty()) {
+            teamRow.teamName = QString("Team %1 (Empty)").arg(teamRow.teamId);
+            continue;
+        }
+
+        // Find player with highest handicap (point target) in this team
+        auto captainIt = std::max_element(teamRow.teamMembers.begin(), teamRow.teamMembers.end(),
+            [](const PlayerInfo& a, const PlayerInfo& b) {
+                return a.handicap < b.handicap; // Higher handicap is "greater"
+            });
+        
+        // Check if max_element returned a valid iterator (not end())
+        if (captainIt != teamRow.teamMembers.end()) {
+            teamRow.teamName = QString("Team %1").arg(captainIt->name);
+        } else {
+            // Should not happen if teamMembers is not empty, but as a fallback:
+            teamRow.teamName = QString("Team %1 (No Captain Found)").arg(teamRow.teamId);
+        }
+        qDebug() << "Determined name for Team ID" << teamRow.teamId << ":" << teamRow.teamName;
+    }
+}
+
+
 void TeamLeaderboardModel::fetchAllHoleDetails() {
     QSqlDatabase db = database();
     if (!db.isValid() || !db.isOpen()) return;
     QSqlQuery query(db);
-    // Fetches course_id, hole_num, par, and hole_handicap_index
     if (query.exec("SELECT course_id, hole_num, par, handicap FROM holes")) {
         while (query.next()) {
             m_allHoleDetails[qMakePair(query.value("course_id").toInt(), query.value("hole_num").toInt())] =
-                qMakePair(query.value("par").toInt(), query.value("handicap").toInt()); // par, hole_handicap_index
+                qMakePair(query.value("par").toInt(), query.value("handicap").toInt());
         }
     } else {
         qDebug() << "TeamLeaderboardModel::fetchAllHoleDetails: ERROR:" << query.lastError().text();
@@ -161,7 +198,7 @@ void TeamLeaderboardModel::fetchAllScores() {
             int holeNum = query.value("hole_num").toInt();
             int scoreVal = query.value("score").toInt();
             int courseId = query.value("course_id").toInt();
-            m_allScores[playerId][dayNum][holeNum] = qMakePair(scoreVal, courseId); // score, course_id
+            m_allScores[playerId][dayNum][holeNum] = qMakePair(scoreVal, courseId);
             m_daysWithScores.insert(dayNum);
         }
     } else {
@@ -169,49 +206,25 @@ void TeamLeaderboardModel::fetchAllScores() {
     }
 }
 
-// Calculates Stableford points for a player on a single hole, applying the new handicap logic.
-int TeamLeaderboardModel::calculateStablefordPoints(
-    int grossScore,             // Actual strokes taken by the player
-    int par,                    // Par for the hole
-    int playerDatabaseHandicap, // Player's handicap from DB (e.g., 0-54)
-    int holeHandicapIndex       // Course's handicap index for this hole (1-18, 1 is hardest)
-) const {
-    if (grossScore <= 0 || par <= 0) { // No score entered or invalid par
-        return 0; 
-    }
+// This is the basic Stableford calculation, not applying the complex player-specific handicap rules here.
+// The complex handicap should be applied to get a NET score first, then that net score used here.
+// However, for the team "sum of 4 best Stableford points", we need individual player Stableford points
+// calculated using their *Twisted Creek* (actual) handicaps.
+int TeamLeaderboardModel::calculateStablefordPoints(int score, int par) const {
+    // This function might need to be the more complex one if individual player handicaps
+    // for Twisted Creek rules are to be applied before summing for the team.
+    // For now, let's assume 'score' is already a NET score for Twisted Creek rules.
+    // OR, this is a GROSS stableford calculation, and net is handled elsewhere.
+    // Based on "sum the stableford points", it implies individual stableford points are calculated first.
+    // Let's assume this is a GROSS Stableford for now, and the team logic will fetch NET.
+    // No, the problem says "sum the stableford points" which are inherently net.
+    // This method needs to be the one from TournamentLeaderboardModel (the complex one)
+    // or a similar one that takes playerActualDbHandicap and holeHandicapIndex.
+    // For simplicity in this step, I'll keep it basic, assuming NET score is fed.
+    // THIS WILL NEED REVISITING if individual player handicaps are applied before summing team points.
 
-    int strokesReceivedOnThisHole = 0;
-
-    if (playerDatabaseHandicap <= 36) {
-        // Player's handicap value is 36 or less.
-        int effectiveStrokesForRound = 36 - playerDatabaseHandicap;
-
-        // Distribute strokes based on hole handicap index
-        if (effectiveStrokesForRound >= holeHandicapIndex) {
-            strokesReceivedOnThisHole++;
-        }
-        if (effectiveStrokesForRound >= (18 + holeHandicapIndex)) {
-            strokesReceivedOnThisHole++;
-        }
-        if (effectiveStrokesForRound >= (36 + holeHandicapIndex)) {
-            strokesReceivedOnThisHole++;
-        }
-    } else {
-        // Player's handicap value is greater than 36.
-        // They give back strokes.
-        // Using std::floor to align with "41 handicap -> -2 strokes (gives back 2)" example.
-        double strokesToGiveBackTotalDouble = (static_cast<double>(playerDatabaseHandicap) - 36.0) / 2.0;
-        int strokesToGiveBackTotal = static_cast<int>(std::floor(strokesToGiveBackTotalDouble)); // Changed from ceil to floor
-
-        if (holeHandicapIndex > (18 - strokesToGiveBackTotal)) {
-            strokesReceivedOnThisHole = -1; 
-        }
-    }
-
-    int netScore = grossScore - strokesReceivedOnThisHole;
-
-    // Calculate Stableford points based on netScore relative to par
-    int diff = netScore - par;
+    if (score <= 0 || par <= 0) return 0;
+    int diff = score - par; // Assuming 'score' is already adjusted for handicap for this player
     if (diff <= -3) return 8; 
     if (diff == -2) return 6; 
     if (diff == -1) return 4; 
@@ -219,8 +232,7 @@ int TeamLeaderboardModel::calculateStablefordPoints(
     if (diff == 1) return 1;  
     if (diff == 2) return 0;  
     if (diff >= 3) return -1; 
-
-    return 0; 
+    return 0;
 }
 
 void TeamLeaderboardModel::calculateTeamLeaderboard() {
@@ -231,66 +243,102 @@ void TeamLeaderboardModel::calculateTeamLeaderboard() {
 
     // Iterate over each day (1, 2, 3)
     for (int dayNum = 1; dayNum <= 3; ++dayNum) {
-        // Iterate over each team (Team IDs 1, 2, 3, 4)
-        for (int teamIdLoop = 1; teamIdLoop <= 4; ++teamIdLoop) { 
+        // Iterate over each team (using m_leaderboardData which now has teamMembers)
+        for (TeamLeaderboardRow &teamRow : m_leaderboardData) {
             int teamDailyTotalStablefordPoints = 0;
-            int teamIndex = teamIdLoop - 1; // 0-indexed for m_leaderboardData
 
             // Iterate over each hole (1 to 18)
             for (int holeNum = 1; holeNum <= 18; ++holeNum) {
-                QVector<int> teamPlayerStablefordScoresForHole;
+                QVector<int> teamPlayerNetStablefordScoresForHole;
 
-                // Find players in the current team
-                for (auto it = m_playerTeamAssignments.constBegin(); it != m_playerTeamAssignments.constEnd(); ++it) {
-                    if (it.value() == teamIdLoop) { // Player is in the current team
-                        int playerId = it.key();
-                        // Ensure player exists in m_allPlayers (should always be true if data is consistent)
-                        if (!m_allPlayers.contains(playerId)) {
-                            qWarning() << "TeamLeaderboardModel: Player ID" << playerId << "found in assignments but not in m_allPlayers. Skipping.";
-                            continue;
-                        }
-                        const PlayerInfo& currentPlayer = m_allPlayers.value(playerId);
+                // Iterate through members of the current team
+                for (const PlayerInfo &member : teamRow.teamMembers) {
+                    int playerId = member.id;
+                    // Check if this player has a score for this day and hole
+                    if (m_allScores.contains(playerId) &&
+                        m_allScores[playerId].contains(dayNum) &&
+                        m_allScores[playerId][dayNum].contains(holeNum)) {
+                        
+                        QPair<int, int> scoreInfo = m_allScores[playerId][dayNum][holeNum];
+                        int playerScoreGross = scoreInfo.first;
+                        int courseIdForScore = scoreInfo.second;
 
-                        // Check if this player has a score for this day and hole
-                        if (m_allScores.contains(playerId) &&
-                            m_allScores[playerId].contains(dayNum) &&
-                            m_allScores[playerId][dayNum].contains(holeNum)) {
+                        QPair<int,int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
+                        if (m_allHoleDetails.contains(holeDetailsKey)) {
+                            int par = m_allHoleDetails[holeDetailsKey].first;
+                            int holeHcIndex = m_allHoleDetails[holeDetailsKey].second;
                             
-                            QPair<int, int> scoreInfo = m_allScores[playerId][dayNum][holeNum];
-                            int playerScoreGross = scoreInfo.first;
-                            int courseIdForScore = scoreInfo.second;
+                            // Calculate NET Stableford points for this player on this hole
+                            // using their actual DB handicap (Twisted Creek rules for team comp)
+                            // We need the complex calculateNetStablefordPointsForHole from TournamentLeaderboardModel here.
+                            // For now, I'll call the basic one, assuming it's been adapted or score is pre-netted.
+                            // THIS IS A PLACEHOLDER FOR THE CORRECT, COMPLEX HANDICAP CALCULATION
+                            // For team scores, use the player's ACTUAL handicap (Twisted Creek rules)Blake Mozley
+                            int points = 0; // Placeholder
+                            // Correct call would be something like:
+                            // points = TournamentLeaderboardModel::calculateNetStablefordPointsForHole(
+                            //     playerScoreGross, par, member.handicap, holeHcIndex, TournamentLeaderboardModel::TwistedCreek
+                            // );
+                            // Since this model doesn't have that directly, we'll use the basic one for now.
+                            // This means the handicap logic for team scores needs to be correctly integrated.
+                            // Let's use the existing simple calculateStablefordPoints and assume score is somehow net.
+                            // To do it properly, we need the full handicap calculation from the other model.
+                            // For now, let's just calculate gross stableford to see structure.
+                            // int gross_diff = playerScoreGross - par;
+                            // if (gross_diff <= -3) points = 8; else if (gross_diff == -2) points = 6; else if (gross_diff == -1) points = 4;
+                            // else if (gross_diff == 0) points = 2; else if (gross_diff == 1) points = 1; else if (gross_diff == 2) points = 0;
+                            // else if (gross_diff >= 3) points = -1;
 
-                            QPair<int,int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
-                            if (m_allHoleDetails.contains(holeDetailsKey)) {
-                                int par = m_allHoleDetails[holeDetailsKey].first;
-                                int holeHcIndex = m_allHoleDetails[holeDetailsKey].second; 
-                                
-                                int points = calculateStablefordPoints(playerScoreGross, par, currentPlayer.handicap, holeHcIndex);
-                                teamPlayerStablefordScoresForHole.append(points);
+                            // Re-inserting the proper call from TournamentLeaderboardModel logic:
+                            // This requires TeamLeaderboardModel to have access to that specific calculation logic.
+                            // Let's assume we'll adapt this model's calculateStablefordPoints to be the complex one.
+                            // For now, I'll call the simple one and it will be incorrect for net.
+                            // The user stated "sum the stableford points" implying they are calculated per player first.
+                            // The Team Leaderboard uses Twisted Creek handicaps (player's actual handicap).
+
+                            // We need a method similar to TournamentLeaderboardModel::calculateNetStablefordPointsForHole
+                            // Let's temporarily define a simplified one here or assume the existing one is for NET.
+                            // For now, the existing calculateStablefordPoints will be used, assuming it gets a NET score.
+                            // This is the main point of complexity to resolve.
+                            // Let's assume calculateStablefordPoints should be the complex one.
+                            // To avoid circular dependencies or large code duplication, this is tricky.
+                            // A shared utility function for handicap calculation would be best.
+                            // For now, I'll duplicate the logic from TournamentLeaderboardModel's calculateNetStablefordPointsForHole
+                            // and ensure it uses the player's actual handicap for team scoring.
+
+                            int handicapForCalc = member.handicap; // Use actual handicap for team scoring
+                            int strokesReceived = 0;
+                            if (handicapForCalc <= 36) {
+                                int effective = 36 - handicapForCalc;
+                                if (effective >= holeHcIndex) strokesReceived++;
+                                if (effective >= (18 + holeHcIndex)) strokesReceived++;
+                                if (effective >= (36 + holeHcIndex)) strokesReceived++;
                             } else {
-                                qDebug() << "TeamLeaderboardModel: Missing hole details for course" << courseIdForScore << "hole" << holeNum;
+                                int toGiveBack = static_cast<int>(std::floor((static_cast<double>(handicapForCalc) - 36.0) / 2.0));
+                                if (holeHcIndex > (18 - toGiveBack)) strokesReceived = -1;
                             }
+                            int netPlayerScore = playerScoreGross - strokesReceived;
+                            points = calculateStablefordPoints(netPlayerScore, par); // Call with net score
+
+                            teamPlayerNetStablefordScoresForHole.append(points);
                         }
                     }
                 }
 
-                std::sort(teamPlayerStablefordScoresForHole.begin(), teamPlayerStablefordScoresForHole.end(), std::greater<int>());
+                std::sort(teamPlayerNetStablefordScoresForHole.begin(), teamPlayerNetStablefordScoresForHole.end(), std::greater<int>());
 
                 int teamHoleScore = 0;
-                for (int k = 0; k < qMin(4, teamPlayerStablefordScoresForHole.size()); ++k) {
-                    teamHoleScore += teamPlayerStablefordScoresForHole[k];
+                for (int k = 0; k < qMin(4, teamPlayerNetStablefordScoresForHole.size()); ++k) {
+                    teamHoleScore += teamPlayerNetStablefordScoresForHole[k];
                 }
                 teamDailyTotalStablefordPoints += teamHoleScore;
             } 
-
-            m_leaderboardData[teamIndex].dailyTeamStablefordPoints[dayNum] = teamDailyTotalStablefordPoints;
-            // Overall points will be summed up after all days are processed for a team
+            teamRow.dailyTeamStablefordPoints[dayNum] = teamDailyTotalStablefordPoints;
         } 
     } 
 
-    // Calculate overall points by summing the daily points for each team
     for(TeamLeaderboardRow &teamRow : m_leaderboardData) {
-        teamRow.overallTeamStablefordPoints = 0; // Reset before summing
+        teamRow.overallTeamStablefordPoints = 0; 
         for(int dayPoints : teamRow.dailyTeamStablefordPoints) {
             teamRow.overallTeamStablefordPoints += dayPoints;
         }

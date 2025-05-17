@@ -8,22 +8,54 @@
 
 TournamentLeaderboardModel::TournamentLeaderboardModel(const QString &connectionName, QObject *parent)
     : QAbstractTableModel(parent)
-    , m_connectionName(connectionName)
-    , m_tournamentContext(TwistedCreek) // Default to Twisted Creek, dialog will set it.
+    , m_connectionName(connectionName) // Store the passed connection name
+    , m_tournamentContext(TwistedCreek) // Default context, dialog will override
     , m_cutLineScore(0)            
     , m_isCutApplied(false)        
 {
+    qDebug() << "TournamentLeaderboardModel instance" << this << "created with connection name:" << m_connectionName;
 }
 
 TournamentLeaderboardModel::~TournamentLeaderboardModel() {}
 
+// This is the critical method for getting the database connection.
 QSqlDatabase TournamentLeaderboardModel::database() const {
-    return QSqlDatabase::database(m_connectionName);
+    // Attempt to retrieve the database connection by the stored name.
+    // The 'false' argument means: do NOT add a new connection if one by this name isn't found.
+    // This helps ensure we are checking the status of the *intended* connection.
+    QSqlDatabase db_check = QSqlDatabase::database(m_connectionName, false); 
+
+    qDebug() << "TournamentLeaderboardModel instance" << this 
+             << "attempting to get DB with name:" << m_connectionName;
+
+    if (!db_check.isValid()) {
+        // This means Qt doesn't even recognize this connection name.
+        // It's a strong indicator the name is wrong or the connection was never added with this name,
+        // or it was removed.
+        qWarning() << "TournamentLeaderboardModel instance" << this 
+                   << "DB connection name '" << m_connectionName << "' is NOT VALID (not found in Qt's list). "
+                   << "Available connections:" << QSqlDatabase::connectionNames();
+    } else {
+        // The connection name is known to Qt. Now check if it's open.
+        qDebug() << "TournamentLeaderboardModel instance" << this 
+                 << "DB connection name '" << m_connectionName << "' IS VALID."
+                 << "Is Open:" << db_check.isOpen()
+                 << "Driver:" << db_check.driverName() 
+                 << "DB File Name:" << db_check.databaseName();
+        if (!db_check.isOpen()) {
+            qWarning() << "TournamentLeaderboardModel instance" << this 
+                       << "DB connection '" << m_connectionName << "' is VALID but NOT OPEN. Last error:" << db_check.lastError().text();
+            // Optional: You could try to db_check.open() here, but it's better to find out WHY it's closed.
+            // If it was closed, opening it here might succeed but hide the root cause.
+        }
+    }
+    return db_check; // Return the retrieved (and possibly not open) connection.
+                     // The calling code (e.g., fetchAllPlayers) must check isOpen().
 }
 
 void TournamentLeaderboardModel::setTournamentContext(TournamentContext context) {
     m_tournamentContext = context;
-    qDebug() << "TournamentLeaderboardModel: Context set to" << (context == MosleyOpen ? "MosleyOpen" : "TwistedCreek");
+    qDebug() << "TournamentLeaderboardModel instance" << this << "- Context set to" << (context == MosleyOpen ? "MosleyOpen" : "TwistedCreek");
 }
 
 void TournamentLeaderboardModel::setCutLineScore(int score) {
@@ -57,25 +89,25 @@ QVariant TournamentLeaderboardModel::data(const QModelIndex &index, int role) co
         switch (index.column()) {
             case 0: return rowData.rank > 0 ? QVariant(rowData.rank) : QVariant("-");
             case 1: return rowData.playerName;             
-            case 2: return rowData.playerActualDbHandicap; // Player's actual DB Handicap
-            case 3: // Day 1 Gross
+            case 2: return rowData.playerActualDbHandicap; 
+            case 3: 
                 return rowData.dailyGrossStablefordPoints.contains(1) ? 
                        QVariant(rowData.dailyGrossStablefordPoints.value(1)) : QVariant(); 
-            case 4: // Day 1 Net
+            case 4: 
                 return rowData.dailyNetStablefordPoints.contains(1) ? 
                        QVariant(rowData.dailyNetStablefordPoints.value(1)) : QVariant();   
-            case 5: // Day 2 Gross
+            case 5: 
                 return rowData.dailyGrossStablefordPoints.contains(2) ? 
                        QVariant(rowData.dailyGrossStablefordPoints.value(2)) : QVariant(); 
-            case 6: // Day 2 Net
+            case 6: 
                 return rowData.dailyNetStablefordPoints.contains(2) ? 
                        QVariant(rowData.dailyNetStablefordPoints.value(2)) : QVariant();   
-            case 7: // Day 3 Gross
+            case 7: 
                 return rowData.dailyGrossStablefordPoints.contains(3) ? 
                        QVariant(rowData.dailyGrossStablefordPoints.value(3)) : QVariant(); 
-            case 8: // Day 3 Net
+            case 8: 
                 return rowData.dailyNetStablefordPoints.contains(3) ? 
-                       QVariant(rowData.dailyNetStablefordPoints.value(3)) : QVariant();  
+                       QVariant(rowData.dailyNetStablefordPoints.value(3)) : QVariant();   
             case 9: return rowData.totalNetStablefordPoints; 
             default: return QVariant();
         }
@@ -91,7 +123,7 @@ QVariant TournamentLeaderboardModel::headerData(int section, Qt::Orientation ori
         switch (section) {
             case 0: return "Rank";
             case 1: return "Player";
-            case 2: return "Actual Hcp"; // Displaying actual DB handicap
+            case 2: return "Actual Hcp"; 
             case 3: return "Day 1 Gross";
             case 4: return "Day 1 Net";
             case 5: return "Day 2 Gross";
@@ -119,19 +151,28 @@ void TournamentLeaderboardModel::refreshData() {
     m_daysWithScores.clear();
     m_playerTwoDayMosleyNetScoreForCut.clear();
 
-    fetchAllPlayers();
+    qDebug() << "TournamentLeaderboardModel instance" << this << "- Refreshing data. Current context:" << (m_tournamentContext == MosleyOpen ? "Mosley" : "Twisted");
+
+    fetchAllPlayers(); // This will call database() and check if it's open
+    if (m_allPlayers.isEmpty()) { // If DB wasn't open, fetchAllPlayers might return early
+         qDebug() << "TournamentLeaderboardModel instance" << this << "- fetchAllPlayers resulted in empty m_allPlayers. Further calculations might be skipped or incorrect.";
+    }
+
     fetchAllHoleDetails();
     fetchAllScores();
     
-    // This MUST be called before calculateLeaderboard, as it's needed for cut decisions
     calculateAllPlayerTwoDayMosleyNetScores(); 
-    
-    calculateLeaderboard(); // Calculates based on m_tournamentContext and cut info
+    calculateLeaderboard(); 
 
     endResetModel();
-    qDebug() << "TournamentLeaderboardModel (" << (m_tournamentContext == MosleyOpen ? "Mosley" : "Twisted") 
+    qDebug() << "TournamentLeaderboardModel instance" << this << "(" << (m_tournamentContext == MosleyOpen ? "Mosley" : "Twisted") 
              << "): Data refreshed. Cut Applied:" << m_isCutApplied << "Cut Score:" << m_cutLineScore
              << "Leaderboard rows:" << m_leaderboardData.size();
+    if (m_leaderboardData.isEmpty() && !m_allPlayers.isEmpty()) {
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- WARNING: m_leaderboardData is empty but m_allPlayers is not. Check filtering logic in calculateLeaderboard.";
+    } else if (m_allPlayers.isEmpty() && (m_tournamentContext == MosleyOpen || m_tournamentContext == TwistedCreek)) { // Expect players if context is set
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- WARNING: m_allPlayers is empty. No players fetched. Leaderboard will be empty.";
+    }
 }
 
 QSet<int> TournamentLeaderboardModel::getDaysWithScores() const {
@@ -139,25 +180,32 @@ QSet<int> TournamentLeaderboardModel::getDaysWithScores() const {
 }
 
 void TournamentLeaderboardModel::fetchAllPlayers() {
-    QSqlDatabase db = database();
-    if (!db.isValid() || !db.isOpen()) return;
+    QSqlDatabase db = database(); // Calls the updated database() method
+    if (!db.isValid() || !db.isOpen()) { // Check is now more critical based on the updated database()
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- fetchAllPlayers: DB connection from database() is not valid or not open. Aborting fetch.";
+        return; // Critical to return if DB is not usable
+    }
     QSqlQuery query(db);
     if (query.exec("SELECT id, name, handicap FROM players WHERE active = 1")) {
         while (query.next()) {
             PlayerInfo player;
             player.id = query.value("id").toInt();
-            player.name = query.value("name").toString();
-            player.handicap = query.value("handicap").toInt(); // Actual DB handicap
+            player.name = query.value("name").toString(); 
+            player.handicap = query.value("handicap").toInt(); 
             m_allPlayers[player.id] = player;
         }
     } else {
-        qDebug() << "TournamentLeaderboardModel::fetchAllPlayers: ERROR:" << query.lastError().text();
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- fetchAllPlayers: SQL ERROR:" << query.lastError().text();
     }
+    qDebug() << "TournamentLeaderboardModel instance" << this << "- fetchAllPlayers: Fetched" << m_allPlayers.size() << "players.";
 }
 
 void TournamentLeaderboardModel::fetchAllHoleDetails() {
     QSqlDatabase db = database();
-    if (!db.isValid() || !db.isOpen()) return;
+    if (!db.isValid() || !db.isOpen()) {
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- fetchAllHoleDetails: DB not open. Skipping.";
+        return;
+    }
     QSqlQuery query(db);
     if (query.exec("SELECT course_id, hole_num, par, handicap FROM holes")) {
         while (query.next()) {
@@ -165,13 +213,16 @@ void TournamentLeaderboardModel::fetchAllHoleDetails() {
                 qMakePair(query.value("par").toInt(), query.value("handicap").toInt());
         }
     } else {
-        qDebug() << "TournamentLeaderboardModel::fetchAllHoleDetails: ERROR:" << query.lastError().text();
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- fetchAllHoleDetails: SQL ERROR:" << query.lastError().text();
     }
 }
 
 void TournamentLeaderboardModel::fetchAllScores() {
     QSqlDatabase db = database();
-    if (!db.isValid() || !db.isOpen()) return;
+     if (!db.isValid() || !db.isOpen()) {
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- fetchAllScores: DB not open. Skipping.";
+        return;
+    }
     QSqlQuery query(db);
     if (query.exec("SELECT player_id, course_id, hole_num, day_num, score FROM scores")) {
         while (query.next()) {
@@ -184,7 +235,7 @@ void TournamentLeaderboardModel::fetchAllScores() {
             m_daysWithScores.insert(dayNum);
         }
     } else {
-        qDebug() << "TournamentLeaderboardModel::fetchAllScores: ERROR:" << query.lastError().text();
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- fetchAllScores: SQL ERROR:" << query.lastError().text();
     }
 }
 
@@ -194,15 +245,13 @@ int TournamentLeaderboardModel::calculateNetStablefordPointsForHole(
 {
     if (grossScore <= 0 || par <= 0) return 0;
 
-    int handicapForThisCalc = playerActualDatabaseHandicap; // Start with actual
+    int handicapForThisCalc = playerActualDatabaseHandicap; 
 
     if (contextForCalc == MosleyOpen) {
         if (playerActualDatabaseHandicap >= 6 && playerActualDatabaseHandicap <= 15) {
-            handicapForThisCalc = 16; // Mosley Open minimum handicap adjustment
+            handicapForThisCalc = 16; 
         }
-        // If actual is < 6 or > 15, it's used as is for Mosley (or already >=16)
     }
-    // For TwistedCreek context, handicapForThisCalc remains playerActualDatabaseHandicap
 
     int strokesReceivedOnThisHole = 0;
     if (handicapForThisCalc <= 36) {
@@ -230,9 +279,13 @@ int TournamentLeaderboardModel::calculateNetStablefordPointsForHole(
 
 void TournamentLeaderboardModel::calculateAllPlayerTwoDayMosleyNetScores() {
     m_playerTwoDayMosleyNetScoreForCut.clear();
+    if (m_allPlayers.isEmpty()) {
+        qDebug() << "TournamentLeaderboardModel instance" << this << "- calculateAllPlayerTwoDayMosleyNetScores: m_allPlayers is empty. Skipping.";
+        return;
+    }
     for (auto const& [playerId, playerInfo] : m_allPlayers.asKeyValueRange()) {
         int twoDayTotalNetForPlayer = 0;
-        for (int dayNum = 1; dayNum <= 2; ++dayNum) { // Only Day 1 and Day 2
+        for (int dayNum = 1; dayNum <= 2; ++dayNum) { 
             if (m_allScores.contains(playerId) && m_allScores[playerId].contains(dayNum)) {
                 for (auto const& [holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange()) {
                     int grossScore = scoreAndCourse.first;
@@ -241,7 +294,6 @@ void TournamentLeaderboardModel::calculateAllPlayerTwoDayMosleyNetScores() {
                     if (m_holeParAndHandicapIndex.contains(holeDetailsKey)) {
                         int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
                         int holeHcIdx = m_holeParAndHandicapIndex[holeDetailsKey].second;
-                        // CRITICAL: Use MosleyOpen context for this specific calculation
                         twoDayTotalNetForPlayer += calculateNetStablefordPointsForHole(
                             grossScore, par, playerInfo.handicap, holeHcIdx, MosleyOpen 
                         );
@@ -251,12 +303,15 @@ void TournamentLeaderboardModel::calculateAllPlayerTwoDayMosleyNetScores() {
         }
         m_playerTwoDayMosleyNetScoreForCut[playerId] = twoDayTotalNetForPlayer;
     }
-    qDebug() << "Calculated 2-day MOSLEY NET totals for cut. Count:" << m_playerTwoDayMosleyNetScoreForCut.size();
+    qDebug() << "TournamentLeaderboardModel instance" << this << "- Calculated 2-day MOSLEY NET totals for cut. Count:" << m_playerTwoDayMosleyNetScoreForCut.size();
 }
 
 
 void TournamentLeaderboardModel::calculateLeaderboard() {
     m_leaderboardData.clear(); 
+    qDebug() << "TournamentLeaderboardModel instance" << this << "- calculateLeaderboard: START. Context:" << (m_tournamentContext == MosleyOpen ? "Mosley" : "Twisted")
+             << "Cut Applied:" << m_isCutApplied << "Cut Score:" << m_cutLineScore << "Total Players to check:" << m_allPlayers.size();
+
 
     for (auto const& [playerId, playerInfo] : m_allPlayers.asKeyValueRange()) {
         bool includePlayer = false;
@@ -268,21 +323,27 @@ void TournamentLeaderboardModel::calculateLeaderboard() {
             } else if (m_tournamentContext == TwistedCreek) {
                 if (playerTwoDayMosleyScore < m_cutLineScore) includePlayer = true;
             }
-        } else { // Cut is NOT applied, all players are in both leaderboards initially
-            includePlayer = true;
+        } else { 
+            includePlayer = true; 
         }
         
+        if (!includePlayer && m_isCutApplied) {
+             qDebug() << "TournamentLeaderboardModel instance" << this << "- Player" << playerInfo.name << "(ID:" << playerId << ") 2-Day Mosley Score:" << playerTwoDayMosleyScore
+                     << "-> NOT INCLUDED in" << (m_tournamentContext == MosleyOpen ? "Mosley" : "Twisted") << "due to cut.";
+        }
+
+
         if (includePlayer) {
             LeaderboardRow row;
             row.playerId = playerId;
             row.playerName = playerInfo.name;
-            row.playerActualDbHandicap = playerInfo.handicap; // Store actual handicap
+            row.playerActualDbHandicap = playerInfo.handicap; 
             row.totalNetStablefordPoints = 0; 
-            row.twoDayMosleyNetScoreForCut = playerTwoDayMosleyScore; // Store for reference if needed
+            row.twoDayMosleyNetScoreForCut = playerTwoDayMosleyScore; 
 
             for (int dayNum = 1; dayNum <= 3; ++dayNum) {
                 int dailyGrossPts = 0;
-                int dailyNetPts = 0; // Net points for *this* leaderboard's context
+                int dailyNetPts = 0; 
                 bool scoresExistForDay = false;
 
                 if (m_allScores.contains(playerId) && m_allScores[playerId].contains(dayNum)) {
@@ -295,7 +356,6 @@ void TournamentLeaderboardModel::calculateLeaderboard() {
                             int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
                             int holeHcIdx = m_holeParAndHandicapIndex[holeDetailsKey].second;
                             
-                            // Calculate Gross Stableford (no handicap application)
                             int grossStablefordDiff = grossScore - par;
                             if (grossStablefordDiff <= -3) dailyGrossPts += 8;
                             else if (grossStablefordDiff == -2) dailyGrossPts += 6;
@@ -305,7 +365,6 @@ void TournamentLeaderboardModel::calculateLeaderboard() {
                             else if (grossStablefordDiff == 2)  dailyGrossPts += 0;
                             else if (grossStablefordDiff >= 3)  dailyGrossPts += -1;
 
-                            // Calculate Net Stableford using the context of THIS model instance
                             dailyNetPts += calculateNetStablefordPointsForHole(
                                 grossScore, par, playerInfo.handicap, holeHcIdx, m_tournamentContext
                             );
@@ -319,6 +378,7 @@ void TournamentLeaderboardModel::calculateLeaderboard() {
                 }
             }
             m_leaderboardData.append(row);
+            // Removed the per-player inclusion debug line from here to reduce noise, main summary is at the end.
         }
     }
 
@@ -337,6 +397,7 @@ void TournamentLeaderboardModel::calculateLeaderboard() {
             }
         }
     }
+    qDebug() << "TournamentLeaderboardModel instance" << this << "- calculateLeaderboard: END. Rows added:" << m_leaderboardData.size();
 }
 
 int TournamentLeaderboardModel::getColumnForDailyGrossPoints(int dayNum) const {
