@@ -33,11 +33,11 @@ public:
 
     // Public method to export the leaderboard as an image
     QImage exportToImage() const;
+    TournamentLeaderboardModel *leaderboardModel; // The model for this leaderboard
 
 private:
     QString m_connectionName; // Stores the database connection name
 
-    TournamentLeaderboardModel *leaderboardModel; // The model for this leaderboard
     QTableView *leaderboardView; // The view to display this leaderboard
 
     // Helper method to get database connection

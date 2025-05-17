@@ -3,428 +3,352 @@
 #include <QSqlError>
 #include <QSqlRecord>
 #include <QSqlField>
-#include <algorithm> // For std::sort
+#include <algorithm> 
+#include <cmath> // For std::floor
 
-// Constructor
 TournamentLeaderboardModel::TournamentLeaderboardModel(const QString &connectionName, QObject *parent)
     : QAbstractTableModel(parent)
     , m_connectionName(connectionName)
+    , m_tournamentContext(TwistedCreek) // Default to Twisted Creek, dialog will set it.
+    , m_cutLineScore(0)            
+    , m_isCutApplied(false)        
 {
-    // Data is loaded on demand via refreshData()
 }
 
-// Destructor
-TournamentLeaderboardModel::~TournamentLeaderboardModel()
-{
-    // No dynamic allocation of model members needed
-}
+TournamentLeaderboardModel::~TournamentLeaderboardModel() {}
 
-// Helper to get the database connection by name
-QSqlDatabase TournamentLeaderboardModel::database() const
-{
+QSqlDatabase TournamentLeaderboardModel::database() const {
     return QSqlDatabase::database(m_connectionName);
 }
 
-// === Required QAbstractTableModel methods implementation ===
-
-// Returns the number of rows (active players on the leaderboard)
-int TournamentLeaderboardModel::rowCount(const QModelIndex &parent) const
-{
-    Q_UNUSED(parent);
-    return m_leaderboardData.size(); // One row per player in the calculated data
+void TournamentLeaderboardModel::setTournamentContext(TournamentContext context) {
+    m_tournamentContext = context;
+    qDebug() << "TournamentLeaderboardModel: Context set to" << (context == MosleyOpen ? "MosleyOpen" : "TwistedCreek");
 }
 
-// Returns the number of columns for the leaderboard display
-int TournamentLeaderboardModel::columnCount(const QModelIndex &parent) const
-{
-    Q_UNUSED(parent);
-    // Columns:
-    // Rank (1)
-    // Player Name (1)
-    // Handicap (1)
-    // Day 1 Total Points (1), Day 1 Net Points (1)
-    // Day 2 Total Points (1), Day 2 Net Points (1)
-    // Day 3 Total Points (1), Day 3 Net Points (1)
-    // Overall Net Stableford Points (1)
-    // Total = 1 + 1 + 1 + 1 + (2 * 3) = 4 + 6 = 10 columns
-    return 10;
+void TournamentLeaderboardModel::setCutLineScore(int score) {
+    m_cutLineScore = score;
 }
 
-// Returns the data for a specific cell
-QVariant TournamentLeaderboardModel::data(const QModelIndex &index, int role) const
-{
-    // Check if the index is valid and within the model's bounds
+void TournamentLeaderboardModel::setIsCutApplied(bool applied) {
+    m_isCutApplied = applied;
+}
+
+int TournamentLeaderboardModel::rowCount(const QModelIndex &parent) const {
+    Q_UNUSED(parent);
+    return m_leaderboardData.size(); 
+}
+
+int TournamentLeaderboardModel::columnCount(const QModelIndex &parent) const {
+    Q_UNUSED(parent);
+    // Rank, Player, ActualHcp, D1 Gross, D1 Net, D2 Gross, D2 Net, D3 Gross, D3 Net, Overall Net Pts
+    return 10; 
+}
+
+QVariant TournamentLeaderboardModel::data(const QModelIndex &index, int role) const {
     if (!index.isValid() || index.row() < 0 || index.row() >= rowCount() ||
-        index.column() < 0 || index.column() >= columnCount())
-    {
+        index.column() < 0 || index.column() >= columnCount()) {
         return QVariant();
     }
 
-    // Get the calculated leaderboard row for the current index
-    const LeaderboardRow* rowData = getLeaderboardRow(index.row());
-    if (!rowData) {
-        return QVariant(); // Should not happen if index is valid
-    }
+    const LeaderboardRow& rowData = m_leaderboardData.at(index.row());
 
-    // Handle DisplayRole
-    if (role == Qt::DisplayRole)
-    {
+    if (role == Qt::DisplayRole) {
         switch (index.column()) {
-            case 0: return rowData->rank;                   // Rank column
-            case 1: return rowData->playerName;             // Player Name column
-            case 2: return rowData->playerHandicap;         // Handicap column// Daily points columns
-            case 3: // Day 1 Total Points
-            case 4: // Day 1 Net Points
-            case 5: // Day 2 Total Points
-            case 6: // Day 2 Net Points
-            case 7: // Day 3 Total Points
-            case 8: // Day 3 Net Points
-            {
-                int dayNum = getDayNumForColumn(index.column());
-                if (dayNum != -1 && rowData->dailyTotalPoints.contains(dayNum)) { // Check if this player has scores for this day
-                     if (index.column() % 2 == 0) { // Even columns (4, 6, 8) are Total Points
-                         return rowData->dailyNetPoints[dayNum];
-                     } else { // Odd columns (3, 5, 7) are Total Points
-                         return rowData->dailyTotalPoints[dayNum];
-                     }
-                }
-                return QVariant(); // Return empty if no scores for this day
-            }
-            case 9: return rowData->totalStablefordPoints; // Total Stableford Points column
-            // Add cases for other columns here
+            case 0: return rowData.rank > 0 ? QVariant(rowData.rank) : QVariant("-");
+            case 1: return rowData.playerName;             
+            case 2: return rowData.playerActualDbHandicap; // Player's actual DB Handicap
+            case 3: // Day 1 Gross
+                return rowData.dailyGrossStablefordPoints.contains(1) ? 
+                       QVariant(rowData.dailyGrossStablefordPoints.value(1)) : QVariant(); 
+            case 4: // Day 1 Net
+                return rowData.dailyNetStablefordPoints.contains(1) ? 
+                       QVariant(rowData.dailyNetStablefordPoints.value(1)) : QVariant();   
+            case 5: // Day 2 Gross
+                return rowData.dailyGrossStablefordPoints.contains(2) ? 
+                       QVariant(rowData.dailyGrossStablefordPoints.value(2)) : QVariant(); 
+            case 6: // Day 2 Net
+                return rowData.dailyNetStablefordPoints.contains(2) ? 
+                       QVariant(rowData.dailyNetStablefordPoints.value(2)) : QVariant();   
+            case 7: // Day 3 Gross
+                return rowData.dailyGrossStablefordPoints.contains(3) ? 
+                       QVariant(rowData.dailyGrossStablefordPoints.value(3)) : QVariant(); 
+            case 8: // Day 3 Net
+                return rowData.dailyNetStablefordPoints.contains(3) ? 
+                       QVariant(rowData.dailyNetStablefordPoints.value(3)) : QVariant();  
+            case 9: return rowData.totalNetStablefordPoints; 
+            default: return QVariant();
+        }
+    } else if (role == Qt::TextAlignmentRole) {
+        if (index.column() == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
+        return QVariant(Qt::AlignCenter);
+    }
+    return QVariant();
+}
+
+QVariant TournamentLeaderboardModel::headerData(int section, Qt::Orientation orientation, int role) const {
+    if (role == Qt::DisplayRole && orientation == Qt::Horizontal) {
+        switch (section) {
+            case 0: return "Rank";
+            case 1: return "Player";
+            case 2: return "Actual Hcp"; // Displaying actual DB handicap
+            case 3: return "Day 1 Gross";
+            case 4: return "Day 1 Net";
+            case 5: return "Day 2 Gross";
+            case 6: return "Day 2 Net";
+            case 7: return "Day 3 Gross";
+            case 8: return "Day 3 Net";
+            case 9: return "Overall Net";
             default: return QVariant();
         }
     }
-
-    // Handle other roles like TextAlignmentRole
-    if (role == Qt::TextAlignmentRole) {
-        switch (index.column()) {
-            case 0: // Rank
-            case 2: // Handicap
-            case 3: // Total Stableford Points
-            case 4: case 5: // Day 1 Total/Net
-            case 6: case 7: // Day 2 Total/Net
-            case 8: case 9: // Day 3 Total/Net
-                return Qt::AlignCenter; // Center align numeric columns
-            case 1: // Player Name
-                return static_cast<int>(Qt::AlignLeft | Qt::AlignVCenter); // Left align name
-            default: return QVariant();
-        }
+    if (role == Qt::TextAlignmentRole && orientation == Qt::Horizontal) {
+        if (section == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
+        return QVariant(Qt::AlignCenter);
     }
-    // Add other roles like BackgroundRole, ForegroundRole, etc.
-
-    return QVariant(); // Return an invalid QVariant for roles we don't handle
+    return QVariant();
 }
 
-// Returns the header data for rows and columns
-QVariant TournamentLeaderboardModel::headerData(int section, Qt::Orientation orientation, int role) const
-{
-    // We only handle DisplayRole for headers
-    if (role == Qt::DisplayRole)
-    {
-        if (orientation == Qt::Horizontal) // Column headers
-        {
-            switch (section) {
-                case 0: return "Rank";
-                case 1: return "Player";
-                case 2: return "Point Target";
-
-                // Daily points headers
-                case 3: return "Day 1 Total";
-                case 4: return "Day 1 Net";
-                case 5: return "Day 2 Total";
-                case 6: return "Day 2 Net";
-                case 7: return "Day 3 Total";
-                case 8: return "Day 3 Net";
-
-                case 9: return "Net Points";
-                // Add headers for other columns here
-                default: return QVariant();
-            }
-        }
-        // Vertical headers are usually not needed for leaderboards
-    }
-
-    // Add other roles like TextAlignmentRole for headers
-    if (role == Qt::TextAlignmentRole) {
-         if (orientation == Qt::Horizontal) {
-            switch (section) {
-                case 0: // Rank
-                case 2: // Handicap
-                case 3: // Total Stableford Points
-                case 4: case 5: // Day 1 Total/Net
-                case 6: case 7: // Day 2 Total/Net
-                case 8: case 9: // Day 3 Total/Net
-                    return Qt::AlignCenter; // Center align numeric column headers
-                case 1: // Player
-                    return static_cast<int>(Qt::AlignLeft | Qt::AlignVCenter); // Left align name header
-                default: return QVariant();
-            }
-         }
-    }
-
-
-    return QVariant(); // Return an invalid QVariant for roles/orientations we don't handle
-}
-
-// === Public method to refresh data and recalculate leaderboard ===
-void TournamentLeaderboardModel::refreshData()
-{
-    // Notify the view that the model's data is about to be reset
+void TournamentLeaderboardModel::refreshData() {
     beginResetModel();
 
-    // Clear previous data
     m_allPlayers.clear();
-    m_allHoleDetails.clear();
+    m_holeParAndHandicapIndex.clear();
     m_allScores.clear();
-    m_leaderboardData.clear(); // Clear calculated data
+    m_leaderboardData.clear(); 
+    m_daysWithScores.clear();
+    m_playerTwoDayMosleyNetScoreForCut.clear();
 
-    // Fetch raw data from the database
     fetchAllPlayers();
     fetchAllHoleDetails();
     fetchAllScores();
+    
+    // This MUST be called before calculateLeaderboard, as it's needed for cut decisions
+    calculateAllPlayerTwoDayMosleyNetScores(); 
+    
+    calculateLeaderboard(); // Calculates based on m_tournamentContext and cut info
 
-    // Perform calculations and ranking
-    calculateLeaderboard();
-
-    // Notify the view that the model's data has been reset
     endResetModel();
-
-    qDebug() << "TournamentLeaderboardModel: Data refreshed. Leaderboard rows:" << m_leaderboardData.size();
+    qDebug() << "TournamentLeaderboardModel (" << (m_tournamentContext == MosleyOpen ? "Mosley" : "Twisted") 
+             << "): Data refreshed. Cut Applied:" << m_isCutApplied << "Cut Score:" << m_cutLineScore
+             << "Leaderboard rows:" << m_leaderboardData.size();
 }
 
-// === Public method to get days with scores ===
-QSet<int> TournamentLeaderboardModel::getDaysWithScores() const
-{
+QSet<int> TournamentLeaderboardModel::getDaysWithScores() const {
     return m_daysWithScores;
 }
 
-// === Private helper methods ===
-
-// Fetches all active players
-void TournamentLeaderboardModel::fetchAllPlayers()
-{
+void TournamentLeaderboardModel::fetchAllPlayers() {
     QSqlDatabase db = database();
-    if (!db.isValid() || !db.isOpen()) {
-        qDebug() << "TournamentLeaderboardModel::fetchAllPlayers: ERROR: Invalid or closed database connection.";
-        return;
-    }
-
+    if (!db.isValid() || !db.isOpen()) return;
     QSqlQuery query(db);
-    // Select players who are marked as active
     if (query.exec("SELECT id, name, handicap FROM players WHERE active = 1")) {
         while (query.next()) {
             PlayerInfo player;
             player.id = query.value("id").toInt();
             player.name = query.value("name").toString();
-            player.handicap = query.value("handicap").toInt();
-            m_allPlayers[player.id] = player; // Store by player ID
+            player.handicap = query.value("handicap").toInt(); // Actual DB handicap
+            m_allPlayers[player.id] = player;
         }
-        qDebug() << "TournamentLeaderboardModel::fetchAllPlayers: Fetched" << m_allPlayers.size() << "active players.";
     } else {
-        qDebug() << "TournamentLeaderboardModel::fetchAllPlayers: ERROR executing query:" << query.lastError().text();
+        qDebug() << "TournamentLeaderboardModel::fetchAllPlayers: ERROR:" << query.lastError().text();
     }
 }
 
-// Fetches details (Par, Handicap) for all holes on all courses
-void TournamentLeaderboardModel::fetchAllHoleDetails()
-{
+void TournamentLeaderboardModel::fetchAllHoleDetails() {
     QSqlDatabase db = database();
-    if (!db.isValid() || !db.isOpen()) {
-        qDebug() << "TournamentLeaderboardModel::fetchAllHoleDetails: ERROR: Invalid or closed database connection.";
-        return;
-    }
-
+    if (!db.isValid() || !db.isOpen()) return;
     QSqlQuery query(db);
-    // Select hole details for all courses and holes
-    if (query.exec("SELECT course_id, hole_num, par, handicap FROM holes ORDER BY course_id, hole_num")) {
+    if (query.exec("SELECT course_id, hole_num, par, handicap FROM holes")) {
         while (query.next()) {
-            int courseId = query.value("course_id").toInt();
-            int holeNum = query.value("hole_num").toInt();
-            int par = query.value("par").toInt();
-            int handicap = query.value("handicap").toInt();
-            m_allHoleDetails[qMakePair(courseId, holeNum)] = qMakePair(par, handicap); // Store by CourseId and HoleNum
+            m_holeParAndHandicapIndex[qMakePair(query.value("course_id").toInt(), query.value("hole_num").toInt())] =
+                qMakePair(query.value("par").toInt(), query.value("handicap").toInt());
         }
-        qDebug() << "TournamentLeaderboardModel::fetchAllHoleDetails: Fetched details for" << m_allHoleDetails.size() << "holes.";
     } else {
-        qDebug() << "TournamentLeaderboardModel::fetchAllHoleDetails: ERROR executing query:" << query.lastError().text();
+        qDebug() << "TournamentLeaderboardModel::fetchAllHoleDetails: ERROR:" << query.lastError().text();
     }
 }
 
-// Fetches all scores for active players across all days and courses
-void TournamentLeaderboardModel::fetchAllScores()
-{
+void TournamentLeaderboardModel::fetchAllScores() {
     QSqlDatabase db = database();
-    if (!db.isValid() || !db.isOpen()) {
-        qDebug() << "TournamentLeaderboardModel::fetchAllScores: ERROR: Invalid or closed database connection.";
-        return;
-    }
-
-    // Build a list of active player IDs
-    QStringList activePlayerIds;
-    for (auto const& [playerId, playerInfo] : m_allPlayers.asKeyValueRange()) {
-        activePlayerIds << QString::number(playerId);
-    }
-
-     if (activePlayerIds.isEmpty()) {
-        qDebug() << "TournamentLeaderboardModel::fetchAllScores: No active players to fetch scores for.";
-        return;
-    }
-
+    if (!db.isValid() || !db.isOpen()) return;
     QSqlQuery query(db);
-    // Select scores for active players across all days and courses
-    // Use an IN clause for player_id
-    QString queryString = QString("SELECT player_id, course_id, hole_num, day_num, score FROM scores WHERE player_id IN (%1) ORDER BY player_id, day_num, hole_num;")
-                          .arg(activePlayerIds.join(","));
-
-    qDebug() << "TournamentLeaderboardModel::fetchAllScores: Executing query:" << queryString;
-
-    if (query.exec(queryString)) {
+    if (query.exec("SELECT player_id, course_id, hole_num, day_num, score FROM scores")) {
         while (query.next()) {
             int playerId = query.value("player_id").toInt();
-            int courseId = query.value("course_id").toInt();
-            int holeNum = query.value("hole_num").toInt();
             int dayNum = query.value("day_num").toInt();
-            int score = query.value("score").toInt();
-
-            // Store the score and course_id in the nested map: m_allScores[playerId][dayNum][holeNum] = Pair<Score, CourseId>
-            m_allScores[playerId][dayNum][holeNum] = qMakePair(score, courseId);
+            int holeNum = query.value("hole_num").toInt();
+            int scoreVal = query.value("score").toInt();
+            int courseId = query.value("course_id").toInt();
+            m_allScores[playerId][dayNum][holeNum] = qMakePair(scoreVal, courseId);
+            m_daysWithScores.insert(dayNum);
         }
-        qDebug() << "TournamentLeaderboardModel::fetchAllScores: Fetched scores for" << m_allScores.size() << "players.";
     } else {
-        qDebug() << "TournamentLeaderboardModel::fetchAllScores: ERROR executing query:" << query.lastError().text();
+        qDebug() << "TournamentLeaderboardModel::fetchAllScores: ERROR:" << query.lastError().text();
     }
 }
 
-
-// Method to perform Stableford calculations and ranking
-void TournamentLeaderboardModel::calculateLeaderboard()
+int TournamentLeaderboardModel::calculateNetStablefordPointsForHole(
+    int grossScore, int par, int playerActualDatabaseHandicap, 
+    int holeHandicapIndex, TournamentContext contextForCalc) const 
 {
-    m_leaderboardData.clear(); // Clear previous calculated data
+    if (grossScore <= 0 || par <= 0) return 0;
 
-    // Iterate through all active players
-    for (auto const& [playerId, playerInfo] : m_allPlayers.asKeyValueRange()) {
-        LeaderboardRow row;
-        row.playerId = playerId;
-        row.playerName = playerInfo.name;
-        row.playerHandicap = playerInfo.handicap;
-        row.totalStablefordPoints = 0; // Initialize overall total
+    int handicapForThisCalc = playerActualDatabaseHandicap; // Start with actual
 
-        // Calculate daily points for this player
-        for (int dayNum = 1; dayNum <= 3; ++dayNum) {
-            int dailyTotal = 0;
-            bool hasScoresForDay = false;
-
-            if (m_allScores.contains(playerId) && m_allScores[playerId].contains(dayNum)) {
-                 hasScoresForDay = true;
-                 for (auto const& [holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange()) {
-                       int score = scoreAndCourse.first;
-                       int courseIdForScore = scoreAndCourse.second;
-
-                       // Find the par for this hole on this course
-                       if (m_allHoleDetails.contains(qMakePair(courseIdForScore, holeNum))) {
-                           int par = m_allHoleDetails[qMakePair(courseIdForScore, holeNum)].first; // Get Par from Pair<Par, Handicap>
-
-                           // Calculate Stableford points for this hole
-                           int points = calculateStablefordPoints(score, par);
-                           dailyTotal += points; // Add to daily total
-                       } else {
-                            qDebug() << "TournamentLeaderboardModel::calculateLeaderboard: Warning: Hole details not found for Course" << courseIdForScore << "Hole" << holeNum;
-                       }
-                 }
-            }
-
-            if (hasScoresForDay) {
-                 row.dailyTotalPoints[dayNum] = dailyTotal;
-                 row.dailyNetPoints[dayNum] = dailyTotal - playerInfo.handicap; // Calculate daily net points
-                 row.totalStablefordPoints += row.dailyNetPoints[dayNum]; // Add daily total to overall total
-                 m_daysWithScores.insert(dayNum);
-            }
-            // If no scores for the day, the entry in dailyTotalPoints/dailyNetPoints map will be missing,
-            // and totalTournamentStablefordPoints remains unchanged for that day.
+    if (contextForCalc == MosleyOpen) {
+        if (playerActualDatabaseHandicap >= 6 && playerActualDatabaseHandicap <= 15) {
+            handicapForThisCalc = 16; // Mosley Open minimum handicap adjustment
         }
+        // If actual is < 6 or > 15, it's used as is for Mosley (or already >=16)
+    }
+    // For TwistedCreek context, handicapForThisCalc remains playerActualDatabaseHandicap
 
-        m_leaderboardData.append(row); // Add the calculated row to the list
+    int strokesReceivedOnThisHole = 0;
+    if (handicapForThisCalc <= 36) {
+        int effectiveStrokesForRound = 36 - handicapForThisCalc;
+        if (effectiveStrokesForRound >= holeHandicapIndex) strokesReceivedOnThisHole++;
+        if (effectiveStrokesForRound >= (18 + holeHandicapIndex)) strokesReceivedOnThisHole++;
+        if (effectiveStrokesForRound >= (36 + holeHandicapIndex)) strokesReceivedOnThisHole++;
+    } else {
+        double strokesToGiveBackTotalDouble = (static_cast<double>(handicapForThisCalc) - 36.0) / 2.0;
+        int strokesToGiveBackTotal = static_cast<int>(std::floor(strokesToGiveBackTotalDouble));
+        if (holeHandicapIndex > (18 - strokesToGiveBackTotal)) strokesReceivedOnThisHole = -1;
+    }
+    int netScore = grossScore - strokesReceivedOnThisHole;
+    int diff = netScore - par;
+
+    if (diff <= -3) return 8; 
+    if (diff == -2) return 6; 
+    if (diff == -1) return 4; 
+    if (diff == 0) return 2;  
+    if (diff == 1) return 1;  
+    if (diff == 2) return 0;  
+    if (diff >= 3) return -1; 
+    return 0;
+}
+
+void TournamentLeaderboardModel::calculateAllPlayerTwoDayMosleyNetScores() {
+    m_playerTwoDayMosleyNetScoreForCut.clear();
+    for (auto const& [playerId, playerInfo] : m_allPlayers.asKeyValueRange()) {
+        int twoDayTotalNetForPlayer = 0;
+        for (int dayNum = 1; dayNum <= 2; ++dayNum) { // Only Day 1 and Day 2
+            if (m_allScores.contains(playerId) && m_allScores[playerId].contains(dayNum)) {
+                for (auto const& [holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange()) {
+                    int grossScore = scoreAndCourse.first;
+                    int courseIdForScore = scoreAndCourse.second;
+                    QPair<int,int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
+                    if (m_holeParAndHandicapIndex.contains(holeDetailsKey)) {
+                        int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
+                        int holeHcIdx = m_holeParAndHandicapIndex[holeDetailsKey].second;
+                        // CRITICAL: Use MosleyOpen context for this specific calculation
+                        twoDayTotalNetForPlayer += calculateNetStablefordPointsForHole(
+                            grossScore, par, playerInfo.handicap, holeHcIdx, MosleyOpen 
+                        );
+                    }
+                }
+            }
+        }
+        m_playerTwoDayMosleyNetScoreForCut[playerId] = twoDayTotalNetForPlayer;
+    }
+    qDebug() << "Calculated 2-day MOSLEY NET totals for cut. Count:" << m_playerTwoDayMosleyNetScoreForCut.size();
+}
+
+
+void TournamentLeaderboardModel::calculateLeaderboard() {
+    m_leaderboardData.clear(); 
+
+    for (auto const& [playerId, playerInfo] : m_allPlayers.asKeyValueRange()) {
+        bool includePlayer = false;
+        int playerTwoDayMosleyScore = m_playerTwoDayMosleyNetScoreForCut.value(playerId, 0);
+
+        if (m_isCutApplied) {
+            if (m_tournamentContext == MosleyOpen) {
+                if (playerTwoDayMosleyScore >= m_cutLineScore) includePlayer = true;
+            } else if (m_tournamentContext == TwistedCreek) {
+                if (playerTwoDayMosleyScore < m_cutLineScore) includePlayer = true;
+            }
+        } else { // Cut is NOT applied, all players are in both leaderboards initially
+            includePlayer = true;
+        }
+        
+        if (includePlayer) {
+            LeaderboardRow row;
+            row.playerId = playerId;
+            row.playerName = playerInfo.name;
+            row.playerActualDbHandicap = playerInfo.handicap; // Store actual handicap
+            row.totalNetStablefordPoints = 0; 
+            row.twoDayMosleyNetScoreForCut = playerTwoDayMosleyScore; // Store for reference if needed
+
+            for (int dayNum = 1; dayNum <= 3; ++dayNum) {
+                int dailyGrossPts = 0;
+                int dailyNetPts = 0; // Net points for *this* leaderboard's context
+                bool scoresExistForDay = false;
+
+                if (m_allScores.contains(playerId) && m_allScores[playerId].contains(dayNum)) {
+                    scoresExistForDay = true;
+                    for (auto const& [holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange()) {
+                        int grossScore = scoreAndCourse.first;
+                        int courseIdForScore = scoreAndCourse.second;
+                        QPair<int,int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
+                        if (m_holeParAndHandicapIndex.contains(holeDetailsKey)) {
+                            int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
+                            int holeHcIdx = m_holeParAndHandicapIndex[holeDetailsKey].second;
+                            
+                            // Calculate Gross Stableford (no handicap application)
+                            int grossStablefordDiff = grossScore - par;
+                            if (grossStablefordDiff <= -3) dailyGrossPts += 8;
+                            else if (grossStablefordDiff == -2) dailyGrossPts += 6;
+                            else if (grossStablefordDiff == -1) dailyGrossPts += 4;
+                            else if (grossStablefordDiff == 0)  dailyGrossPts += 2;
+                            else if (grossStablefordDiff == 1)  dailyGrossPts += 1;
+                            else if (grossStablefordDiff == 2)  dailyGrossPts += 0;
+                            else if (grossStablefordDiff >= 3)  dailyGrossPts += -1;
+
+                            // Calculate Net Stableford using the context of THIS model instance
+                            dailyNetPts += calculateNetStablefordPointsForHole(
+                                grossScore, par, playerInfo.handicap, holeHcIdx, m_tournamentContext
+                            );
+                        }
+                    }
+                }
+                if (scoresExistForDay) { 
+                    row.dailyGrossStablefordPoints[dayNum] = dailyGrossPts;
+                    row.dailyNetStablefordPoints[dayNum] = dailyNetPts;
+                    row.totalNetStablefordPoints += dailyNetPts; 
+                }
+            }
+            m_leaderboardData.append(row);
+        }
     }
 
-    // --- Rank the players ---
-    // Sort m_leaderboardData by totalTournamentStablefordPoints in descending order
     std::sort(m_leaderboardData.begin(), m_leaderboardData.end(),
               [](const LeaderboardRow& a, const LeaderboardRow& b) {
-                  return a.totalStablefordPoints > b.totalStablefordPoints; // Sort descending
+                  return a.totalNetStablefordPoints > b.totalNetStablefordPoints; 
               });
 
-    // Assign ranks based on the sorted order
     if (!m_leaderboardData.isEmpty()) {
-        m_leaderboardData[0].rank = 1; // First player is rank 1
+        m_leaderboardData[0].rank = 1; 
         for (int i = 1; i < m_leaderboardData.size(); ++i) {
-            // Assign same rank if points are tied
-            if (m_leaderboardData[i].totalStablefordPoints == m_leaderboardData[i-1].totalStablefordPoints) {
+            if (m_leaderboardData[i].totalNetStablefordPoints == m_leaderboardData[i-1].totalNetStablefordPoints) {
                 m_leaderboardData[i].rank = m_leaderboardData[i-1].rank;
             } else {
-                m_leaderboardData[i].rank = i + 1; // Otherwise, rank is based on position
+                m_leaderboardData[i].rank = i + 1; 
             }
         }
     }
 }
 
-// Helper to calculate Stableford points for a single hole score relative to par
-// Rules: Triple Bogey = -1, Double Bogey = 0, Bogey = 1, Par = 2, Birdie = 4, Eagle = 6, Double Eagle = 8
-// Net score relative to par determines points. Handicap is applied as starting points.
-int TournamentLeaderboardModel::calculateStablefordPoints(int score, int par) const
-{
-    if (score <= 0 || par <= 0) {
-        return 0; // Cannot calculate points for unentered score or invalid par
-    }
-
-    // Calculate difference relative to par
-    int diff = score - par;
-
-    // Determine points based on the difference
-    if (diff <= -3) return 8; // Double Eagle or better
-    if (diff == -2) return 6; // Eagle
-    if (diff == -1) return 4; // Birdie
-    if (diff == 0) return 2;  // Par
-    if (diff == 1) return 1;  // Bogey
-    if (diff == 2) return 0;  // Double Bogey
-    if (diff >= 3) return -1; // Triple Bogey or worse
-
-    return 0; // Should not be reached if score/par are valid
+int TournamentLeaderboardModel::getColumnForDailyGrossPoints(int dayNum) const {
+    if (dayNum == 1) return 3; 
+    if (dayNum == 2) return 5; 
+    if (dayNum == 3) return 7; 
+    return -1; 
 }
 
-
-// Helper to get LeaderboardRow by row index in m_leaderboardData
-const LeaderboardRow* TournamentLeaderboardModel::getLeaderboardRow(int row) const
-{
-    if (row >= 0 && row < m_leaderboardData.size()) {
-        return &m_leaderboardData.at(row);
-    }
-    return nullptr; // Invalid row
-}
-
-// Helper to get the column index for a specific daily points column
-// Columns 3-8 are daily points: Day 1 Total (3), Day 1 Net (4), Day 2 Total (5), Day 2 Net (6), Day 3 Total (7), Day 3 Net (8)
-int TournamentLeaderboardModel::getColumnForDailyTotalPoints(int dayNum) const
-{
-    if (dayNum >= 1 && dayNum <= 3) {
-        return 3 + (dayNum - 1) * 2;
-    }
-    return -1; // Invalid day number
-}
-
-int TournamentLeaderboardModel::getColumnForDailyNetPoints(int dayNum) const
-{
-     if (dayNum >= 1 && dayNum <= 3) {
-        return 3 + (dayNum - 1) * 2 + 1;
-    }
-    return -1; // Invalid day number
-}
-
-// Helper to get the day number from a daily points column index
-int TournamentLeaderboardModel::getDayNumForColumn(int column) const
-{
-    if (column >= 3 && column <= 8) {
-        return 1 + (column - 3) / 2;
-    }
-    return -1; // Not a daily points column
+int TournamentLeaderboardModel::getColumnForDailyNetPoints(int dayNum) const {
+    if (dayNum == 1) return 4; 
+    if (dayNum == 2) return 6; 
+    if (dayNum == 3) return 8; 
+    return -1; 
 }

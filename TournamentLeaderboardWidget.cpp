@@ -89,7 +89,7 @@ void TournamentLeaderboardWidget::updateColumnVisibility()
 
     // Columns 3-8 in the model are daily points (Day 1 Total, Day 1 Net, Day 2 Total, Day 2 Net, Day 3 Total, Day 3 Net)
     for (int dayNum = 1; dayNum <= 3; ++dayNum) {
-        int totalCol = leaderboardModel->getColumnForDailyTotalPoints(dayNum); // 4, 6, 8
+        int totalCol = leaderboardModel->getColumnForDailyGrossPoints(dayNum); // 4, 6, 8
         int netCol = leaderboardModel->getColumnForDailyNetPoints(dayNum);   // 5, 7, 9
 
         // Note: The model's getColumnForDailyTotalPoints/NetPoints return indices 4-9.
@@ -161,7 +161,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const
 
     // Add width for daily columns only if the day has scores AND the column is not hidden in the view
     for (int dayNum = 1; dayNum <= 3; ++dayNum) {
-        int totalColModelIndex = leaderboardModel->getColumnForDailyTotalPoints(dayNum); // 4, 6, 8
+        int totalColModelIndex = leaderboardModel->getColumnForDailyGrossPoints(dayNum); // 4, 6, 8
         int netColModelIndex = leaderboardModel->getColumnForDailyNetPoints(dayNum);   // 5, 7, 9
 
         if (totalColModelIndex != -1 && !leaderboardView->isColumnHidden(totalColModelIndex)) {
@@ -232,7 +232,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const
 
     // Draw daily headers (Columns 3-8 in model), only if the day has scores AND column is visible
     for (int dayNum = 1; dayNum <= 3; ++dayNum) {
-        int totalColModelIndex = leaderboardModel->getColumnForDailyTotalPoints(dayNum); // 4, 6, 8
+        int totalColModelIndex = leaderboardModel->getColumnForDailyGrossPoints(dayNum); // 4, 6, 8
         int netColModelIndex = leaderboardModel->getColumnForDailyNetPoints(dayNum);   // 5, 7, 9
 
         if (totalColModelIndex != -1 && !leaderboardView->isColumnHidden(totalColModelIndex)) {
@@ -304,7 +304,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const
 
         // Draw daily data columns (Columns 3-8 in model), only if the day has scores AND column is visible
         for (int dayNum = 1; dayNum <= 3; ++dayNum) {
-            int totalColModelIndex = leaderboardModel->getColumnForDailyTotalPoints(dayNum); // 4, 6, 8
+            int totalColModelIndex = leaderboardModel->getColumnForDailyGrossPoints(dayNum); // 4, 6, 8
             int netColModelIndex = leaderboardModel->getColumnForDailyNetPoints(dayNum);   // 5, 7, 9
 
             if (totalColModelIndex != -1 && !leaderboardView->isColumnHidden(totalColModelIndex)) {
