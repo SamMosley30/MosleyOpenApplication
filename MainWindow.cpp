@@ -12,10 +12,7 @@ MainWindow::MainWindow(QSqlDatabase &db, QWidget *parent) // db is a reference t
     : QMainWindow(parent)
     , database(db) // Store the reference
 {
-    QString connNameToPass = database.connectionName(); // Get connection name from the referenced db object
-    qDebug() << "MainWindow constructor - DB Connection Name from referenced db object:" << connNameToPass;
-    qDebug() << "MainWindow constructor - Is it the default connection name? " << (connNameToPass == QSqlDatabase::defaultConnection);
-    qDebug() << "MainWindow constructor - Is referenced db object open?" << database.isOpen();
+    QString connNameToPass = database.connectionName();
 
 
     playerDialog = new PlayerDialog(database, this); // Pass the QSqlDatabase reference

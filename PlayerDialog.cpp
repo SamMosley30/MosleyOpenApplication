@@ -22,7 +22,7 @@ PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
 
     tableView->setModel(model);
     tableView->hideColumn(0);
-    tableView->hideColumn(4);
+    tableView->hideColumn(4); // Ignore the team membership
     tableView->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     tableView->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     tableView->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
@@ -46,7 +46,7 @@ PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
     connect(addButton, &QPushButton::clicked, this, &PlayerDialog::addPlayer);
     connect(removeButton, &QPushButton::clicked, this, &PlayerDialog::removeSelected);
     connect(closeButton, &QPushButton::clicked, this, &QDialog::accept);
-    connect(exportButton, &QPushButton::clicked, this, &PlayerDialog::exportToCsv); // Connect to the new slot
+    connect(exportButton, &QPushButton::clicked, this, &PlayerDialog::exportToCsv);
 }
 
 void PlayerDialog::addPlayer() {
@@ -63,24 +63,18 @@ void PlayerDialog::removeSelected() {
         return; 
     }
 
-    qDebug() << "Attempting to remove" << selected.count() << "rows.";
-
     // Mark rows for removal in the cache
     for (int i = selected.count() - 1; i >= 0; --i) {
         int rowToRemove = selected.at(i).row();
-        qDebug() << "Marking row" << rowToRemove << "for removal.";
         if (!model->removeRow(rowToRemove)) {
              qWarning() << "Failed to mark row" << rowToRemove << "for removal in model cache.";
              // Maybe continue, maybe return, depends on desired behavior
         }
     }
 
-    qDebug() << "Calling submitAll() to commit removals...";
     bool success = model->submitAll();
-    qDebug() << "submitAll() returned:" << success; // Log the EXACT return value
 
     if (success) {
-        qDebug() << "submitAll() reported SUCCESS.";
         // Even on success, check for potential lingering errors (less common)
         if (model->lastError().isValid() && model->lastError().type() != QSqlError::NoError) {
              qWarning() << "WARNING: submitAll() returned true, but there's a lingering model error:" << model->lastError();
@@ -95,13 +89,7 @@ void PlayerDialog::removeSelected() {
         qDebug() << "Calling revertAll() due to submission failure.";
         model->revertAll(); 
     }
-
-    // *** KEY DIAGNOSTIC STEP ***
-    // Force the model to re-select data from the database AFTER the submit attempt.
-    // This will synchronize the model/view with the *actual* database state.
-    qDebug() << "Forcing model refresh with select().";
     model->select(); 
-    qDebug() << "Model refresh complete.";
 }
 
 void PlayerDialog::exportToCsv() {

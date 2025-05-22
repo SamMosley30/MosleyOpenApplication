@@ -11,19 +11,14 @@ int main(int argc, char *argv[]) {
     QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE"); // This becomes the default connection
     db.setDatabaseName("tournament.db");
 
-    qDebug() << "main.cpp - Initial DB Connection Name:" << db.connectionName(); // DEBUG
-    qDebug() << "main.cpp - Is default connection:" << (db.connectionName() == QSqlDatabase::defaultConnection); // DEBUG
-
     if (!db.open()) {
         QMessageBox::critical(nullptr, QObject::tr("Database Error"), db.lastError().text());
         qDebug() << "main.cpp - DB Open FAILED:" << db.lastError().text(); // DEBUG
         return 1;
     }
-    qDebug() << "main.cpp - DB Opened Successfully. Connection Name:" << db.connectionName(); // DEBUG
 
 
     QSqlQuery q(db);
-    // Players table: Added team_id column
     q.exec(R"(
     CREATE TABLE IF NOT EXISTS players (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
