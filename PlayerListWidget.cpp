@@ -43,7 +43,6 @@ void PlayerListWidget::addPlayer(const PlayerInfo& player) {
     item->setData(Qt::UserRole + 1, player.handicap);
 }
 
-
 // --- Dragging FROM this list ---
 
 void PlayerListWidget::mousePressEvent(QMouseEvent *event) {

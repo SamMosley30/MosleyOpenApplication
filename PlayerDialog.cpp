@@ -1,12 +1,13 @@
 #include "PlayerDialog.h"
-#include "SpinBoxDelegate.h"
-#include "CheckBoxDelegate.h"
-#include <QtWidgets>
-#include <QtSql>
+#include "SpinBoxDelegate.h"    // For SpinBoxDelegate
+#include "CheckBoxDelegate.h" // For CheckBoxDelegate
+#include <QtWidgets>            // For QTableView, QPushButton, Layouts etc.
+#include <QtSql>                // For QSqlTableModel, QSqlQuery, QSqlError
 
 PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
     : QDialog(parent)
-    , model(new QSqlTableModel(this, db))
+    // No need to store 'db' as a member if only used for model initialization here
+    , model(new QSqlTableModel(this, db)) // 'this' for parent, 'db' for database
     , tableView(new QTableView(this))
     , addButton(new QPushButton(tr("Add"), this))
     , removeButton(new QPushButton(tr("Remove"), this))
@@ -15,14 +16,14 @@ PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
 {
     model->setTable("players");
     model->setEditStrategy(QSqlTableModel::OnFieldChange);
-    model->select();
+    model->select(); // Initial population
     model->setHeaderData(1, Qt::Horizontal, tr("Name"));
     model->setHeaderData(2, Qt::Horizontal, tr("Handicap"));
     model->setHeaderData(3, Qt::Horizontal, tr("Active"));
 
     tableView->setModel(model);
-    tableView->hideColumn(0);
-    tableView->hideColumn(4); // Ignore the team membership
+    tableView->hideColumn(0); // Hide 'id' column
+    tableView->hideColumn(4); // Hide 'team' column
     tableView->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
     tableView->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     tableView->horizontalHeader()->setSectionResizeMode(3, QHeaderView::ResizeToContents);
@@ -52,9 +53,22 @@ PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
 void PlayerDialog::addPlayer() {
     int row = model->rowCount();
     model->insertRow(row);
-    model->setData(model->index(row, 1), "New Player");
-    model->setData(model->index(row, 2), 0);
-    model->setData(model->index(row, 3), 0);
+    // Set default values for the new row
+    model->setData(model->index(row, 1), "New Player"); // Name column
+    model->setData(model->index(row, 2), 0);          // Handicap column
+    model->setData(model->index(row, 3), 0);          // Active column (0 for false/unchecked)
+
+    // Explicitly submit changes to ensure it's written to the DB,
+    // especially important in test environments or when OnFieldChange might not trigger.
+    if (!model->submitAll()) {
+        qWarning() << "PlayerDialog::addPlayer - submitAll() failed:" << model->lastError().text();
+        // Optionally, revert if submission fails
+        // model->revertAll(); 
+    } else {
+        qDebug() << "PlayerDialog::addPlayer - New player submitted successfully.";
+        // The model should refresh itself after submitAll if needed, or call select()
+        // model->select(); // May not be needed if submitAll updates the view.
+    }
 }
 
 void PlayerDialog::removeSelected() {
@@ -63,110 +77,76 @@ void PlayerDialog::removeSelected() {
         return; 
     }
 
-    // Mark rows for removal in the cache
+    // Remove rows from bottom up to avoid index shifting issues
     for (int i = selected.count() - 1; i >= 0; --i) {
-        int rowToRemove = selected.at(i).row();
-        if (!model->removeRow(rowToRemove)) {
-             qWarning() << "Failed to mark row" << rowToRemove << "for removal in model cache.";
-             // Maybe continue, maybe return, depends on desired behavior
+        // The QSqlTableModel::removeRow marks the row for deletion.
+        // The actual deletion from DB happens on submitAll() or based on edit strategy.
+        if (!model->removeRow(selected.at(i).row())) {
+             qWarning() << "PlayerDialog::removeSelected - Failed to mark row for removal in model cache.";
         }
     }
 
-    bool success = model->submitAll();
-
-    if (success) {
-        // Even on success, check for potential lingering errors (less common)
-        if (model->lastError().isValid() && model->lastError().type() != QSqlError::NoError) {
-             qWarning() << "WARNING: submitAll() returned true, but there's a lingering model error:" << model->lastError();
-        }
-        // The view should update automatically here if signals worked.
-    } else {
-        qCritical() << "submitAll() reported FAILURE."; // Use qCritical for emphasis
-        qCritical() << "Database Error:" << model->lastError(); // Log the error
+    // Submit all pending changes (including row deletions)
+    if (!model->submitAll()) {
+        qCritical() << "PlayerDialog::removeSelected - submitAll() FAILED for deletions. Database Error:" << model->lastError();
         QMessageBox::critical(this, "Database Error",
                              "Failed to remove the selected player(s) from the database.\nError: " + model->lastError().text());
-        
-        qDebug() << "Calling revertAll() due to submission failure.";
-        model->revertAll(); 
+        model->revertAll(); // Revert changes in the model cache if DB commit failed
+    } else {
+        qDebug() << "PlayerDialog::removeSelected - Row(s) submitted for deletion successfully.";
     }
-    model->select(); 
+    // The model should update itself after submitAll. If not, an explicit select() might be needed.
+    // model->select(); // To ensure view reflects the database state accurately.
 }
 
 void PlayerDialog::exportToCsv() {
-    // Use QFileDialog to get the file path from the user
     QString filePath = QFileDialog::getSaveFileName(this,
-                                                    tr("Export Player Data"), // Dialog title
-                                                    QDir::homePath(),         // Default directory
-                                                    tr("CSV Files (*.csv);;All Files (*)") // File filters
+                                                    tr("Export Player Data"), 
+                                                    QDir::homePath(),         
+                                                    tr("CSV Files (*.csv);;All Files (*)")
                                                     );
-
-    // Check if the user cancelled the dialog
     if (filePath.isEmpty()) {
         return;
     }
-
-    // Ensure the file path has a .csv extension
     if (!filePath.toLower().endsWith(".csv")) {
         filePath += ".csv";
     }
 
-    // Open the file for writing
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        // Show an error message if the file cannot be opened
         QMessageBox::critical(this, tr("File Error"),
                               tr("Could not open file for writing: %1").arg(file.errorString()));
         return;
     }
 
-    // Create a text stream to write to the file
     QTextStream out(&file);
-    out.setEncoding(QStringConverter::Utf8); // Use UTF-8 encoding for broader compatibility
+    out.setEncoding(QStringConverter::Utf8); 
 
-    // --- Write the header row ---
-    // Iterate through the visible columns of the model
     QStringList headerLabels;
-    // Get the horizontal header from the view (to check for hidden columns if needed)
-    QHeaderView *header = tableView->horizontalHeader();
     for (int i = 0; i < model->columnCount(); ++i) {
-        // Check if the column is visible in the view (optional, but good practice)
-        // if (!tableView->isColumnHidden(i)) {
-            // Get the header data for the column (DisplayRole for text)
-            QString headerText = model->headerData(i, Qt::Horizontal, Qt::DisplayRole).toString();
-            // Handle potential commas or quotes in header text for CSV
-            headerLabels << QString("\"%1\"").arg(headerText.replace("\"", "\"\"")); // Enclose in quotes and escape existing quotes
-        // }
+        if (tableView->isColumnHidden(i)) continue; // Skip hidden columns like 'id'
+        QString headerText = model->headerData(i, Qt::Horizontal, Qt::DisplayRole).toString();
+        headerLabels << QString("\"%1\"").arg(headerText.replace("\"", "\"\"")); 
     }
-    out << headerLabels.join(",") << "\n"; // Join headers with commas and add a newline
+    out << headerLabels.join(",") << "\n"; 
 
-    // --- Write the data rows ---
-    // Iterate through all rows in the model
     for (int row = 0; row < model->rowCount(); ++row) {
         QStringList rowData;
-        // Iterate through all columns in the model
         for (int column = 0; column < model->columnCount(); ++column) {
-            // Check if the column is visible (optional)
-            // if (!tableView->isColumnHidden(column)) {
-                // Get the data for the cell (DisplayRole)
-                QVariant cellData = model->data(model->index(row, column), Qt::DisplayRole);
-                QString cellString = cellData.toString(); // Convert data to string
-
-                // Handle potential commas, quotes, or newlines in cell data for CSV
-                // Basic handling: enclose in quotes if it contains comma, quote, or newline
-                if (cellString.contains(',') || cellString.contains('"') || cellString.contains('\n') || cellString.contains('\r')) {
-                     rowData << QString("\"%1\"").arg(cellString.replace("\"", "\"\"")); // Enclose and escape quotes
-                } else {
-                     rowData << cellString; // Just add the string if no special characters
-                }
-            // }
+            if (tableView->isColumnHidden(column)) continue;
+            QVariant cellData = model->data(model->index(row, column), Qt::DisplayRole);
+            QString cellString = cellData.toString(); 
+            if (cellData.typeId() == QMetaType::Bool) { // Handle boolean for 'active' column
+                cellString = cellData.toBool() ? "1" : "0";
+            }
+            if (cellString.contains(',') || cellString.contains('"') || cellString.contains('\n') || cellString.contains('\r')) {
+                 rowData << QString("\"%1\"").arg(cellString.replace("\"", "\"\"")); 
+            } else {
+                 rowData << cellString; 
+            }
         }
-        out << rowData.join(",") << "\n"; // Join cell data with commas and add a newline
+        out << rowData.join(",") << "\n"; 
     }
-
-    // Close the file (QFile will auto-close when it goes out of scope or file.close() is called)
-    // file.close(); // Explicitly close if needed
-
-    // Optional: Show a success message
     QMessageBox::information(this, tr("Export Successful"),
                              tr("Player data exported to:\n%1").arg(QDir::toNativeSeparators(filePath)));
 }

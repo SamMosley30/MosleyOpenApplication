@@ -12,7 +12,7 @@ class PlayerDialog : public QDialog {
 public:
     explicit PlayerDialog(QSqlDatabase &db, QWidget *parent = nullptr);
 
-private slots:
+public slots:
     void addPlayer();
     void removeSelected();
     void exportToCsv();

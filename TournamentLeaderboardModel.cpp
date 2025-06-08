@@ -265,7 +265,7 @@ int TournamentLeaderboardModel::calculateNetStablefordPointsForHole(
         if (holeHandicapIndex > (18 - strokesToGiveBackTotal)) strokesReceivedOnThisHole = -1;
     }
     int netScore = grossScore - strokesReceivedOnThisHole;
-    int diff = netScore - par;
+    int diff = grossScore - par;
 
     if (diff <= -3) return 8; 
     if (diff == -2) return 6; 
@@ -299,6 +299,7 @@ void TournamentLeaderboardModel::calculateAllPlayerTwoDayMosleyNetScores() {
                         );
                     }
                 }
+                twoDayTotalNetForPlayer -= playerInfo.handicap; 
             }
         }
         m_playerTwoDayMosleyNetScoreForCut[playerId] = twoDayTotalNetForPlayer;
@@ -343,7 +344,6 @@ void TournamentLeaderboardModel::calculateLeaderboard() {
 
             for (int dayNum = 1; dayNum <= 3; ++dayNum) {
                 int dailyGrossPts = 0;
-                int dailyNetPts = 0; 
                 bool scoresExistForDay = false;
 
                 if (m_allScores.contains(playerId) && m_allScores[playerId].contains(dayNum)) {
@@ -355,7 +355,7 @@ void TournamentLeaderboardModel::calculateLeaderboard() {
                         if (m_holeParAndHandicapIndex.contains(holeDetailsKey)) {
                             int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
                             int holeHcIdx = m_holeParAndHandicapIndex[holeDetailsKey].second;
-                            
+
                             int grossStablefordDiff = grossScore - par;
                             if (grossStablefordDiff <= -3) dailyGrossPts += 8;
                             else if (grossStablefordDiff == -2) dailyGrossPts += 6;
@@ -364,17 +364,13 @@ void TournamentLeaderboardModel::calculateLeaderboard() {
                             else if (grossStablefordDiff == 1)  dailyGrossPts += 1;
                             else if (grossStablefordDiff == 2)  dailyGrossPts += 0;
                             else if (grossStablefordDiff >= 3)  dailyGrossPts += -1;
-
-                            dailyNetPts += calculateNetStablefordPointsForHole(
-                                grossScore, par, playerInfo.handicap, holeHcIdx, m_tournamentContext
-                            );
                         }
                     }
                 }
                 if (scoresExistForDay) { 
                     row.dailyGrossStablefordPoints[dayNum] = dailyGrossPts;
-                    row.dailyNetStablefordPoints[dayNum] = dailyNetPts;
-                    row.totalNetStablefordPoints += dailyNetPts; 
+                    row.dailyNetStablefordPoints[dayNum] = dailyGrossPts - playerInfo.handicap;
+                    row.totalNetStablefordPoints += row.dailyNetStablefordPoints[dayNum]; 
                 }
             }
             m_leaderboardData.append(row);

@@ -267,45 +267,6 @@ void TeamLeaderboardModel::calculateTeamLeaderboard() {
                         if (m_allHoleDetails.contains(holeDetailsKey)) {
                             int par = m_allHoleDetails[holeDetailsKey].first;
                             int holeHcIndex = m_allHoleDetails[holeDetailsKey].second;
-                            
-                            // Calculate NET Stableford points for this player on this hole
-                            // using their actual DB handicap (Twisted Creek rules for team comp)
-                            // We need the complex calculateNetStablefordPointsForHole from TournamentLeaderboardModel here.
-                            // For now, I'll call the basic one, assuming it's been adapted or score is pre-netted.
-                            // THIS IS A PLACEHOLDER FOR THE CORRECT, COMPLEX HANDICAP CALCULATION
-                            // For team scores, use the player's ACTUAL handicap (Twisted Creek rules)Blake Mozley
-                            int points = 0; // Placeholder
-                            // Correct call would be something like:
-                            // points = TournamentLeaderboardModel::calculateNetStablefordPointsForHole(
-                            //     playerScoreGross, par, member.handicap, holeHcIndex, TournamentLeaderboardModel::TwistedCreek
-                            // );
-                            // Since this model doesn't have that directly, we'll use the basic one for now.
-                            // This means the handicap logic for team scores needs to be correctly integrated.
-                            // Let's use the existing simple calculateStablefordPoints and assume score is somehow net.
-                            // To do it properly, we need the full handicap calculation from the other model.
-                            // For now, let's just calculate gross stableford to see structure.
-                            // int gross_diff = playerScoreGross - par;
-                            // if (gross_diff <= -3) points = 8; else if (gross_diff == -2) points = 6; else if (gross_diff == -1) points = 4;
-                            // else if (gross_diff == 0) points = 2; else if (gross_diff == 1) points = 1; else if (gross_diff == 2) points = 0;
-                            // else if (gross_diff >= 3) points = -1;
-
-                            // Re-inserting the proper call from TournamentLeaderboardModel logic:
-                            // This requires TeamLeaderboardModel to have access to that specific calculation logic.
-                            // Let's assume we'll adapt this model's calculateStablefordPoints to be the complex one.
-                            // For now, I'll call the simple one and it will be incorrect for net.
-                            // The user stated "sum the stableford points" implying they are calculated per player first.
-                            // The Team Leaderboard uses Twisted Creek handicaps (player's actual handicap).
-
-                            // We need a method similar to TournamentLeaderboardModel::calculateNetStablefordPointsForHole
-                            // Let's temporarily define a simplified one here or assume the existing one is for NET.
-                            // For now, the existing calculateStablefordPoints will be used, assuming it gets a NET score.
-                            // This is the main point of complexity to resolve.
-                            // Let's assume calculateStablefordPoints should be the complex one.
-                            // To avoid circular dependencies or large code duplication, this is tricky.
-                            // A shared utility function for handicap calculation would be best.
-                            // For now, I'll duplicate the logic from TournamentLeaderboardModel's calculateNetStablefordPointsForHole
-                            // and ensure it uses the player's actual handicap for team scoring.
-
                             int handicapForCalc = member.handicap; // Use actual handicap for team scoring
                             int strokesReceived = 0;
                             if (handicapForCalc <= 36) {
@@ -318,7 +279,7 @@ void TeamLeaderboardModel::calculateTeamLeaderboard() {
                                 if (holeHcIndex > (18 - toGiveBack)) strokesReceived = -1;
                             }
                             int netPlayerScore = playerScoreGross - strokesReceived;
-                            points = calculateStablefordPoints(netPlayerScore, par); // Call with net score
+                            int points = calculateStablefordPoints(netPlayerScore, par); // Call with net score
 
                             teamPlayerNetStablefordScoresForHole.append(points);
                         }
@@ -328,7 +289,7 @@ void TeamLeaderboardModel::calculateTeamLeaderboard() {
                 std::sort(teamPlayerNetStablefordScoresForHole.begin(), teamPlayerNetStablefordScoresForHole.end(), std::greater<int>());
 
                 int teamHoleScore = 0;
-                for (int k = 0; k < qMin(4, teamPlayerNetStablefordScoresForHole.size()); ++k) {
+                for (int k = 0; k < qMin(2, teamPlayerNetStablefordScoresForHole.size()); ++k) {
                     teamHoleScore += teamPlayerNetStablefordScoresForHole[k];
                 }
                 teamDailyTotalStablefordPoints += teamHoleScore;
