@@ -8,7 +8,7 @@
 
 TeamAssemblyDialog::TeamAssemblyDialog(QSqlDatabase &db, QWidget *parent)
     : QDialog(parent), database(db) {
-    teamsData.resize(4); // Initialize for 4 teams
+    teamsData.resize(5); // Initialize for 5 teams
     setupUI();
     loadActivePlayers(); // Load initial players and their persisted team assignments
 
@@ -35,21 +35,13 @@ void TeamAssemblyDialog::setupUI() {
     activePlayersLayout->addWidget(refreshPlayersButton);
     activePlayersLayout->addWidget(activePlayersListWidget);
 
-    connect(activePlayersListWidget, &PlayerListWidget::playerAboutToBeRemoved, this, [this](QListWidgetItem* item){
-        PlayerInfo player = activePlayersListWidget->getPlayerInfoFromItem(item);
-        if (player.id != -1) {
-            availablePlayersData.erase(std::remove_if(availablePlayersData.begin(), availablePlayersData.end(),
-                                                 [&](const PlayerInfo& p) { return p.id == player.id; }),
-                                  availablePlayersData.end());
-            qDebug() << "Player" << player.name << "dragged OUT from Available Players List. Internal available count:" << availablePlayersData.size();
-        }
-    });
-    connect(activePlayersListWidget, &PlayerListWidget::playerDropped, this, &TeamAssemblyDialog::handlePlayerDropped);
+    connect(activePlayersListWidget, QOverload<const PlayerInfo&, PlayerListWidget*, PlayerListWidget*>::of(&PlayerListWidget::playerDropped),
+        this, &TeamAssemblyDialog::handlePlayerDropped);
 
     // Teams Section
     QHBoxLayout *teamsLayout = new QHBoxLayout(); 
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 5; ++i) {
         QGroupBox *teamXGroupBox = new QGroupBox(tr("Team %1").arg(i + 1)); 
         QVBoxLayout *teamXLayout = new QVBoxLayout(teamXGroupBox);
         PlayerListWidget *teamXListWidget = new PlayerListWidget(this);
@@ -58,16 +50,8 @@ void TeamAssemblyDialog::setupUI() {
         teamXLayout->addWidget(teamXListWidget);
         teamsLayout->addWidget(teamXGroupBox); 
 
-        connect(teamXListWidget, &PlayerListWidget::playerDropped, this, &TeamAssemblyDialog::handlePlayerDropped);
-        connect(teamXListWidget, &PlayerListWidget::playerAboutToBeRemoved, this, [this, i, teamXListWidget](QListWidgetItem* item){
-            PlayerInfo player = teamXListWidget->getPlayerInfoFromItem(item);
-            if (player.id != -1) {
-                teamsData[i].erase(std::remove_if(teamsData[i].begin(), teamsData[i].end(),
-                                               [&](const PlayerInfo& p){ return p.id == player.id; }),
-                                teamsData[i].end());
-                qDebug() << "Player" << player.name << "dragged OUT from internal team" << i;
-            }
-        });
+        connect(teamXListWidget, QOverload<const PlayerInfo&, PlayerListWidget*, PlayerListWidget*>::of(&PlayerListWidget::playerDropped),
+            this, &TeamAssemblyDialog::handlePlayerDropped);
     }
 
     // Buttons Layout
@@ -119,7 +103,7 @@ void TeamAssemblyDialog::loadActivePlayers() {
                 teamId = teamIdVariant.toInt();
             }
 
-            if (teamId >= 1 && teamId <= 4) { // Player is assigned to a valid team (1-4)
+            if (teamId >= 1 && teamId <= 5) { // Player is assigned to a valid team (1-5)
                 int teamIndex = teamId - 1; // Convert to 0-based index
                 if (teamIndex < teamsData.size()) {
                     teamsData[teamIndex].push_back(player);
@@ -142,40 +126,52 @@ void TeamAssemblyDialog::loadActivePlayers() {
     }
 }
 
-void TeamAssemblyDialog::handlePlayerDropped(const PlayerInfo& player, PlayerListWidget* targetList) {
-    qDebug() << "Player" << player.name << "(ID:" << player.id << ") dropped onto list:" << targetList->objectName();
+void TeamAssemblyDialog::handlePlayerDropped(const PlayerInfo& player, PlayerListWidget* sourceList, PlayerListWidget* targetList) {
+    qDebug() << "Player" << player.name << "(ID:" << player.id << ") dropped. Source:" << (sourceList ? sourceList->objectName() : "null") << "Target:" << targetList->objectName();
 
-    // Step 1: Remove player from ALL internal data structures.
-    availablePlayersData.erase(std::remove_if(availablePlayersData.begin(), availablePlayersData.end(),
-                                         [&](const PlayerInfo& p) { return p.id == player.id; }),
-                          availablePlayersData.end());
-    for (auto& team_vec : teamsData) {
-        team_vec.erase(std::remove_if(team_vec.begin(), team_vec.end(),
-                                      [&](const PlayerInfo& p) { return p.id == player.id; }),
-                       team_vec.end());
+    // A drop within the same list is just a reorder. No data model change needed.
+    if (!sourceList || !targetList || sourceList == targetList)
+        return;
+
+    // Step 1: Find the source and target internal data vectors
+    std::vector<PlayerInfo>* sourceData = nullptr;
+    if (sourceList == activePlayersListWidget) {
+        sourceData = &availablePlayersData;
+    } else {
+        for (size_t i = 0; i < teamListWidgets.size(); ++i) {
+            if (teamListWidgets[i] == sourceList) {
+                sourceData = &teamsData[i];
+                break;
+            }
+        }
     }
 
-    // Step 2: Add player to the target list's internal data structure.
+    std::vector<PlayerInfo>* targetData = nullptr;
     if (targetList == activePlayersListWidget) {
-        if (std::none_of(availablePlayersData.begin(), availablePlayersData.end(), [&](const PlayerInfo& p){ return p.id == player.id; })) {
-            availablePlayersData.push_back(player);
-            std::sort(availablePlayersData.begin(), availablePlayersData.end(), [](const PlayerInfo& a, const PlayerInfo& b){ return a.name < b.name; });
-            qDebug() << "Player" << player.name << "added to internal availablePlayersData.";
-        }
+        targetData = &availablePlayersData;
     } else { 
         for (size_t i = 0; i < teamListWidgets.size(); ++i) {
             if (teamListWidgets[i] == targetList) {
-                if (std::none_of(teamsData[i].begin(), teamsData[i].end(), [&](const PlayerInfo& p){ return p.id == player.id; })) {
-                    teamsData[i].push_back(player);
-                     qDebug() << "Player" << player.name << "added to internal teamsData[" << i << "].";
-                }
+                targetData = &teamsData[i];
                 break; 
             }
         }
     }
-    // (Debug printout removed for brevity, can be re-added if needed)
-}
 
+    if (!sourceData || !targetData) {
+        qWarning() << "Could not map source or target list to an internal data model.";
+        return;
+    }
+
+    // Step 2: Move the player from the source vector to the target vector
+    sourceData->erase(std::remove_if(sourceData->begin(), sourceData->end(),
+                                     [&](const PlayerInfo& p) { return p.id == player.id; }),
+                      sourceData->end());
+
+    targetData->push_back(player);
+    
+    qDebug() << "Successfully moved player" << player.name << "in the internal data model.";
+}
 
 void TeamAssemblyDialog::autoAssignTeams() {
     qDebug() << "Auto-Assigning Teams...";
@@ -234,7 +230,7 @@ void TeamAssemblyDialog::saveTeams() {
 
     // Update players assigned to teams
     for (size_t i = 0; i < teamsData.size(); ++i) {
-        int teamNumberToSave = i + 1; // Team ID in DB will be 1, 2, 3, 4
+        int teamNumberToSave = i + 1; // Team ID in DB will be 1, 2, 3, 4, 5
         for (const auto& player : teamsData[i]) {
             QSqlQuery query(database);
             query.prepare("UPDATE players SET team_id = :teamId WHERE id = :playerId");

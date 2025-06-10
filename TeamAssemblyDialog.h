@@ -24,7 +24,7 @@ private slots:
     void autoAssignTeams(); 
     void saveTeams();       
     // This slot is called when a player is successfully dropped onto any PlayerListWidget
-    void handlePlayerDropped(const PlayerInfo& player, PlayerListWidget* targetList);
+    void handlePlayerDropped(const PlayerInfo& player, PlayerListWidget* sourceList, PlayerListWidget* targetList);
 
 private:
     QSqlDatabase &database;

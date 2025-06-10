@@ -7,8 +7,8 @@
 TeamLeaderboardModel::TeamLeaderboardModel(const QString &connectionName, QObject *parent)
     : QAbstractTableModel(parent), m_connectionName(connectionName) {
     // Initialize leaderboard data for 4 teams
-    m_leaderboardData.resize(4);
-    for (int i = 0; i < 4; ++i) {
+    m_leaderboardData.resize(5);
+    for (int i = 0; i < 5; ++i) {
         m_leaderboardData[i].teamId = i + 1;
         // Initial name, will be overwritten by determineTeamNames()
         m_leaderboardData[i].teamName = QString("Team %1 (Unassigned)").arg(i + 1); 
@@ -25,7 +25,7 @@ QSqlDatabase TeamLeaderboardModel::database() const {
 
 int TeamLeaderboardModel::rowCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return m_leaderboardData.size(); // Always 4 teams
+    return m_leaderboardData.size(); // Always 5 teams
 }
 
 int TeamLeaderboardModel::columnCount(const QModelIndex &parent) const {
@@ -289,7 +289,7 @@ void TeamLeaderboardModel::calculateTeamLeaderboard() {
                 std::sort(teamPlayerNetStablefordScoresForHole.begin(), teamPlayerNetStablefordScoresForHole.end(), std::greater<int>());
 
                 int teamHoleScore = 0;
-                for (int k = 0; k < qMin(2, teamPlayerNetStablefordScoresForHole.size()); ++k) {
+                for (int k = 0; k < qMin(3, teamPlayerNetStablefordScoresForHole.size()); ++k) {
                     teamHoleScore += teamPlayerNetStablefordScoresForHole[k];
                 }
                 teamDailyTotalStablefordPoints += teamHoleScore;

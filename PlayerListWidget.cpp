@@ -85,25 +85,14 @@ void PlayerListWidget::startDrag() {
 
     QDrag *drag = new QDrag(this);
     drag->setMimeData(mimeData);
-    // Optional: drag->setPixmap(pixmap); drag->setHotSpot(point);
 
-    qDebug() << "PlayerListWidget (" << this->objectName() << "): Starting drag for" << player.name;
-    emit playerAboutToBeRemoved(draggedItem); // Dialog uses this to update its internal model of the source
-
-    // Qt::MoveAction suggests to the system that the item should be moved.
-    // If the drop is accepted on a target, Qt will attempt to remove the item from the source.
+    // If the move is successful, remove the item from the source list.
     if (drag->exec(Qt::MoveAction) == Qt::MoveAction) {
-        // This block executes if the drop was accepted with a MoveAction.
-        // If the drop target was another widget, the item is typically removed from this source list by Qt.
-        // If the drop target was THIS list (internal move/reorder), Qt also handles the reorder.
-        // No explicit deletion of 'draggedItem' from 'this' list is needed here, as Qt handles it
-        // for a successful MoveAction.
+        // FIX: Manually delete the item from the source list widget.
+        delete takeItem(row(draggedItem));
+        
         qDebug() << "PlayerListWidget (" << this->objectName() << "): Drag for" << player.name << "completed with MoveAction.";
     } else {
-        // Drag was cancelled or not accepted as a move. Item remains in the source list.
-        // The playerAboutToBeRemoved signal might have been handled by the dialog;
-        // if the drag is cancelled, the dialog might need to "undo" its internal model change.
-        // This is handled by the dialog only reacting to playerDropped on a *new* target.
         qDebug() << "PlayerListWidget (" << this->objectName() << "): Drag for" << player.name << "did not result in MoveAction (e.g., cancelled).";
     }
     draggedItem = nullptr; // Reset after drag operation
@@ -165,14 +154,8 @@ void PlayerListWidget::dropEvent(QDropEvent *event) {
         qDebug() << "PlayerListWidget (" << this->objectName() << "): Adding player from drop:" << player.name;
         this->addPlayer(player); // Add the player to this (target) list's UI
         event->acceptProposedAction(); // Accept the drop action.
-
-        // The source list's item (if it was a PlayerListWidget) should have been removed 
-        // by Qt's MoveAction handling because drag->exec() was called with Qt::MoveAction 
-        // in the source's startDrag(). The TeamAssemblyDialog is responsible for updating 
-        // its internal data models based on the playerAboutToBeRemoved signal (from source) 
-        // and playerDropped signal (from this target).
         
-        emit playerDropped(player, this); 
+        emit playerDropped(player, sourceListWidget, this); 
     } else {
         qDebug() << "PlayerListWidget (" << this->objectName() << "): Drop ignored - invalid player ID from MIME data.";
         event->ignore();

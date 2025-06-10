@@ -21,8 +21,9 @@ public:
     void addPlayer(const PlayerInfo& player);
 
 signals:
-    void playerDropped(const PlayerInfo& player, PlayerListWidget* targetList); // Emitted by target
-    void playerAboutToBeRemoved(QListWidgetItem* item); // Emitted by source before removing
+    // Emitted by the TARGET list, includes both source and target for context.
+    void playerDropped(const PlayerInfo& player, PlayerListWidget* sourceList, PlayerListWidget* targetList);
+ 
 
 protected:
     // Dragging from this list
