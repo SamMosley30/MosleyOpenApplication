@@ -17,19 +17,8 @@ TournamentLeaderboardWidget::TournamentLeaderboardWidget(const QString &connecti
       leaderboardModel(nullptr),      // Initialize pointers to nullptr
       leaderboardView(nullptr) {
 
-    qDebug() << "TournamentLeaderboardWidget instance" << this << "CONSTRUCTOR START.";
-    qDebug() << "  Parameter 'connectionName':" << connectionName;
-    qDebug() << "  Member 'm_connectionName' (after direct initialization):" << this->m_connectionName;
-
-    // (2) Member 'm_connectionName' is used to construct the model
-    // Create model in the constructor body for more precise debugging
     QString nameToPassToModel = this->m_connectionName;
-    qDebug() << "  Name being passed to TournamentLeaderboardModel constructor:" << nameToPassToModel;
-    
     this->leaderboardModel = new TournamentLeaderboardModel(nameToPassToModel, this); 
-    
-    qDebug() << "  TournamentLeaderboardModel instance created at address:" << this->leaderboardModel;
-    qDebug() << "  (Check model's constructor log for the name it actually received)";
 
     this->leaderboardView = new QTableView(this);
 
@@ -39,7 +28,6 @@ TournamentLeaderboardWidget::TournamentLeaderboardWidget(const QString &connecti
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->addWidget(leaderboardView);
     setLayout(mainLayout);
-    qDebug() << "TournamentLeaderboardWidget instance" << this << "CONSTRUCTOR END.";
 }
 
 TournamentLeaderboardWidget::~TournamentLeaderboardWidget() {}
@@ -75,14 +63,12 @@ void TournamentLeaderboardWidget::configureTableView() {
 }
 
 void TournamentLeaderboardWidget::refreshData() {
-    qDebug() << "TournamentLeaderboardWidget instance" << this << ": Refreshing data...";
     if (leaderboardModel) { 
         leaderboardModel->refreshData(); 
     } else {
         qWarning() << "TournamentLeaderboardWidget instance" << this << ": leaderboardModel is null in refreshData()!";
     }
     updateColumnVisibility(); 
-    qDebug() << "TournamentLeaderboardWidget instance" << this << ": Data refresh complete.";
 }
 
 void TournamentLeaderboardWidget::updateColumnVisibility() {
@@ -98,9 +84,7 @@ void TournamentLeaderboardWidget::updateColumnVisibility() {
     leaderboardView->setColumnHidden(5, !day2HasScores); 
     leaderboardView->setColumnHidden(6, !day2HasScores); 
     leaderboardView->setColumnHidden(7, !day3HasScores); 
-    leaderboardView->setColumnHidden(8, !day3HasScores); 
-    
-    qDebug() << "TournamentLeaderboardWidget instance" << this << ": Column visibility updated. Days with scores:" << daysWithScores;
+    leaderboardView->setColumnHidden(8, !day3HasScores);
 }
 
 
@@ -209,6 +193,5 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
     painter.drawLine(currentX, padding, currentX, totalHeight - padding);
     
     painter.end();
-    qDebug() << "TournamentLeaderboardWidget instance" << this << ": Image exported.";
     return image;
 }

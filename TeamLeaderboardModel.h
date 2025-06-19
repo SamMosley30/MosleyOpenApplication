@@ -56,6 +56,8 @@ private:
     void fetchAllHoleDetails();
     void fetchAllScores();
     void determineTeamNames(); // New method to set team names based on captain
+    std::optional<int> getPlayerNetStablefordForHole(const PlayerInfo& member, int dayNum, int holeNum) const;
+    int calculateTeamScoreForHole(TeamLeaderboardRow & teamRow, int dayNum, int holeNum) const;
     void calculateTeamLeaderboard();
     int calculateStablefordPoints(int score, int par) const; // Assuming this is the basic one, not the complex per-player one
 };

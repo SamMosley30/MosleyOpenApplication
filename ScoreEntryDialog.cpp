@@ -180,7 +180,6 @@ void ScoreEntryDialog::populateCourseComboBoxes()
             day2CourseComboBox->addItem(courseName, courseId);
             day3CourseComboBox->addItem(courseName, courseId);
         }
-        qDebug() << "ScoreEntryDialog::populateCourseComboBoxes: Populated course combo boxes.";
     } else {
         qDebug() << "ScoreEntryDialog::populateCourseComboBoxes: ERROR executing query:" << query.lastError().text();
     }
@@ -254,11 +253,8 @@ void ScoreEntryDialog::saveCourseSelection(int dayNum, int courseId)
     query.bindValue(":key", key);
     query.bindValue(":value", value);
 
-    if (!query.exec()) {
+    if (!query.exec())
         qDebug() << "ScoreEntryDialog::saveCourseSelection: ERROR saving setting" << key << ":" << query.lastError().text();
-    } else {
-        qDebug() << "ScoreEntryDialog::saveCourseSelection: Saved setting" << key << "=" << value;
-    }
 }
 
 // Retrieves the saved course ID for a given day from the settings table
@@ -288,8 +284,6 @@ int ScoreEntryDialog::getSavedCourseSelection(int dayNum)
     } else {
         // Setting not found or query failed, return default invalid ID
         qDebug() << "ScoreEntryDialog::getSavedCourseSelection: Setting" << key << "not found or query failed.";
-        // Optional: Log query error if it's not just "not found"
-        // if (query.lastError().isValid()) qDebug() << "Query error:" << query.lastError().text();
         return -1;
     }
 }
@@ -299,7 +293,6 @@ void ScoreEntryDialog::onDay1CourseSelected(int index)
 {
     // Get the selected course ID from the combo box's UserData
     int courseId = day1CourseComboBox->itemData(index).toInt();
-    qDebug() << "ScoreEntryDialog: Day 1 course selected. ID:" << courseId;
 
     // Tell the Day 1 score model to load data for this course
     day1ScoreModel->setCourseId(courseId);
@@ -311,7 +304,6 @@ void ScoreEntryDialog::onDay1CourseSelected(int index)
 void ScoreEntryDialog::onDay2CourseSelected(int index)
 {
     int courseId = day2CourseComboBox->itemData(index).toInt();
-    qDebug() << "ScoreEntryDialog: Day 2 course selected. ID:" << courseId;
     day2ScoreModel->setCourseId(courseId);
 
     // --- Save the selected course ID ---
@@ -321,7 +313,6 @@ void ScoreEntryDialog::onDay2CourseSelected(int index)
 void ScoreEntryDialog::onDay3CourseSelected(int index)
 {
     int courseId = day3CourseComboBox->itemData(index).toInt();
-    qDebug() << "ScoreEntryDialog: Day 3 course selected. ID:" << courseId;
     day3ScoreModel->setCourseId(courseId);
 
     // --- Save the selected course ID ---
@@ -390,8 +381,7 @@ void ScoreEntryDialog::clearData()
         query.bindValue(":cid", currentCourseId);
 
         if (query.exec()) {
-            qDebug() << "ScoreEntryDialog::resetScores: Scores reset for Day" << currentDayNum << "Course ID" << currentCourseId;
-
+            
             // Clear the data in the corresponding model and notify the view
             if (currentModel) {
                 currentModel->setCourseId(currentCourseId); // Calling setCourseId with the same ID will clear and reload (which will now be empty)

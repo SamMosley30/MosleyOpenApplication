@@ -213,8 +213,6 @@ void HolesTransposedModel::setCourseId(int courseId)
                 int fetchedPar = query.value("par").toInt();
                 int fetchedHandicap = query.value("handicap").toInt();
 
-                // qDebug() << "HolesTransposedModel: Fetched Hole #" << fetchedHoleNum << "Par:" << fetchedPar << "Handicap:" << fetchedHandicap;
-
                 // Update the corresponding HoleData in the vector based on hole number
                 if (fetchedHoleNum >= 1 && fetchedHoleNum <= 18) {
                      m_holeData[fetchedHoleNum - 1].par = fetchedPar;
@@ -225,8 +223,6 @@ void HolesTransposedModel::setCourseId(int courseId)
             }
         } else {
             qDebug() << "HolesTransposedModel: ERROR executing query to fetch holes:" << query.lastError().text();
-            // Handle query execution error - data remains at default zeros
-            // Data is already reset to zeros via the initialization before the query
         }
 
         // Notify the view that the model's data has been reset

@@ -60,15 +60,8 @@ void PlayerDialog::addPlayer() {
 
     // Explicitly submit changes to ensure it's written to the DB,
     // especially important in test environments or when OnFieldChange might not trigger.
-    if (!model->submitAll()) {
+    if (!model->submitAll())
         qWarning() << "PlayerDialog::addPlayer - submitAll() failed:" << model->lastError().text();
-        // Optionally, revert if submission fails
-        // model->revertAll(); 
-    } else {
-        qDebug() << "PlayerDialog::addPlayer - New player submitted successfully.";
-        // The model should refresh itself after submitAll if needed, or call select()
-        // model->select(); // May not be needed if submitAll updates the view.
-    }
 }
 
 void PlayerDialog::removeSelected() {
@@ -92,11 +85,7 @@ void PlayerDialog::removeSelected() {
         QMessageBox::critical(this, "Database Error",
                              "Failed to remove the selected player(s) from the database.\nError: " + model->lastError().text());
         model->revertAll(); // Revert changes in the model cache if DB commit failed
-    } else {
-        qDebug() << "PlayerDialog::removeSelected - Row(s) submitted for deletion successfully.";
     }
-    // The model should update itself after submitAll. If not, an explicit select() might be needed.
-    // model->select(); // To ensure view reflects the database state accurately.
 }
 
 void PlayerDialog::exportToCsv() {

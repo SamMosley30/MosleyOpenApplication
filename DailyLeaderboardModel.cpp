@@ -147,8 +147,6 @@ void DailyLeaderboardModel::refreshData()
 
     // Notify the view that the model's data has been reset
     endResetModel();
-
-    qDebug() << QString("DailyLeaderboardModel (Day %1): Data refreshed. Leaderboard rows: %2").arg(m_dayNum).arg(m_leaderboardData.size());
 }
 
 // === Private helper methods ===
@@ -171,7 +169,6 @@ void DailyLeaderboardModel::fetchAllPlayers()
             player.handicap = query.value("handicap").toInt();
             m_allPlayers[player.id] = player;
         }
-        qDebug() << "DailyLeaderboardModel::fetchAllPlayers: Fetched" << m_allPlayers.size() << "active players.";
     } else {
         qDebug() << "DailyLeaderboardModel::fetchAllPlayers: ERROR executing query:" << query.lastError().text();
     }
@@ -195,7 +192,6 @@ void DailyLeaderboardModel::fetchAllHoleDetails()
             int handicap = query.value("handicap").toInt();
             m_allHoleDetails[qMakePair(courseId, holeNum)] = qMakePair(par, handicap);
         }
-        qDebug() << "DailyLeaderboardModel::fetchAllHoleDetails: Fetched details for" << m_allHoleDetails.size() << "holes.";
     } else {
         qDebug() << "DailyLeaderboardModel::fetchAllHoleDetails: ERROR executing query:" << query.lastError().text();
     }
@@ -225,8 +221,6 @@ void DailyLeaderboardModel::fetchDailyScores()
     QString queryString = QString("SELECT player_id, course_id, hole_num, score FROM scores WHERE player_id IN (%1) AND day_num = %2 ORDER BY player_id, hole_num;")
                           .arg(activePlayerIds.join(",")).arg(m_dayNum);
 
-    qDebug() << "DailyLeaderboardModel::fetchDailyScores: Executing query:" << queryString;
-
     if (query.exec(queryString)) {
         while (query.next()) {
             int playerId = query.value("player_id").toInt();
@@ -237,7 +231,6 @@ void DailyLeaderboardModel::fetchDailyScores()
             // Store the score and course_id: m_dailyScores[playerId][holeNum] = Pair<Score, CourseId>
             m_dailyScores[playerId][holeNum] = qMakePair(score, courseId);
         }
-        qDebug() << QString("DailyLeaderboardModel::fetchDailyScores: Fetched scores for Day %1 for %2 players.").arg(m_dayNum).arg(m_dailyScores.size());
     } else {
         qDebug() << "DailyLeaderboardModel::fetchDailyScores: ERROR executing query:" << query.lastError().text();
     }

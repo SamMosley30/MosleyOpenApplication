@@ -90,8 +90,6 @@ void PlayerListWidget::startDrag() {
     if (drag->exec(Qt::MoveAction) == Qt::MoveAction) {
         // FIX: Manually delete the item from the source list widget.
         delete takeItem(row(draggedItem));
-        
-        qDebug() << "PlayerListWidget (" << this->objectName() << "): Drag for" << player.name << "completed with MoveAction.";
     } else {
         qDebug() << "PlayerListWidget (" << this->objectName() << "): Drag for" << player.name << "did not result in MoveAction (e.g., cancelled).";
     }
@@ -128,30 +126,17 @@ void PlayerListWidget::dropEvent(QDropEvent *event) {
 
     // Case 1: Drag and drop within the SAME list (reordering)
     if (sourceListWidget == this) {
-        qDebug() << "PlayerListWidget (" << this->objectName() << "): Internal drop (reorder). Accepting.";
-        // The item is just being reordered.
-        // The QDrag operation with Qt::MoveAction (from startDrag) should handle the actual move of the item
-        // in the UI. We don't need to add it again or explicitly remove it from itself.
-        // We just accept the event to allow Qt to complete the move/reorder.
         event->acceptProposedAction();
-        // Calling the base class QListWidget::dropEvent(event) might be necessary if Qt's default
-        // drag-and-drop handling for internal moves isn't automatically reordering the visual item
-        // when only acceptProposedAction() is called in an overridden dropEvent.
-        // For now, let's assume acceptProposedAction() is sufficient for Qt to handle the reorder.
-        // If items visually disappear or don't reorder on self-drop, uncommenting the next line is a good test.
-        // QListWidget::dropEvent(event); 
         return; 
     }
 
     // Case 2: Drop from a DIFFERENT PlayerListWidget
-    qDebug() << "PlayerListWidget (" << this->objectName() << "): Drop received from external source:" << (sourceListWidget ? sourceListWidget->objectName() : "Unknown source");
     QByteArray itemDataByteArray = event->mimeData()->data(PLAYER_MIME_TYPE);
     QDataStream dataStream(&itemDataByteArray, QIODevice::ReadOnly);
     PlayerInfo player;
     dataStream >> player.id >> player.name >> player.handicap;
 
     if (player.id != -1) {
-        qDebug() << "PlayerListWidget (" << this->objectName() << "): Adding player from drop:" << player.name;
         this->addPlayer(player); // Add the player to this (target) list's UI
         event->acceptProposedAction(); // Accept the drop action.
         

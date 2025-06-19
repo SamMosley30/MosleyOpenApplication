@@ -205,8 +205,6 @@ void CoursesDialog::exportData() {
         }
         courseFile.close();
         exportedFiles << QDir::toNativeSeparators(courseFilePath);
-        qDebug() << "Course data exported to:" << courseFilePath;
-
     } else {
         qCritical() << "Failed to open file for course data export:" << courseFilePath << "-" << courseFile.errorString();
          QMessageBox::critical(this, tr("File Error"),
@@ -251,7 +249,6 @@ void CoursesDialog::exportData() {
             }
             allHolesFile.close();
             exportedFiles << QDir::toNativeSeparators(allHolesFilePath);
-            qDebug() << "All Hole data (normalized) exported to:" << allHolesFilePath;
         } else {
             allHolesFile.close(); // Close file even on query error
             failedFiles << QDir::toNativeSeparators(allHolesFilePath);

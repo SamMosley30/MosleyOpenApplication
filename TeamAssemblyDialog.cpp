@@ -118,17 +118,12 @@ void TeamAssemblyDialog::loadActivePlayers() {
                 activePlayersListWidget->addPlayer(player); // Add to UI
             }
         }
-        qDebug() << "Loaded active players. Available:" << availablePlayersData.size() 
-                 << "Team0:" << teamsData[0].size() << "Team1:" << teamsData[1].size()
-                 << "Team2:" << teamsData[2].size() << "Team3:" << teamsData[3].size();
     } else {
         QMessageBox::critical(this, tr("Database Query Error"), query.lastError().text());
     }
 }
 
 void TeamAssemblyDialog::handlePlayerDropped(const PlayerInfo& player, PlayerListWidget* sourceList, PlayerListWidget* targetList) {
-    qDebug() << "Player" << player.name << "(ID:" << player.id << ") dropped. Source:" << (sourceList ? sourceList->objectName() : "null") << "Target:" << targetList->objectName();
-
     // A drop within the same list is just a reorder. No data model change needed.
     if (!sourceList || !targetList || sourceList == targetList)
         return;
@@ -169,12 +164,9 @@ void TeamAssemblyDialog::handlePlayerDropped(const PlayerInfo& player, PlayerLis
                       sourceData->end());
 
     targetData->push_back(player);
-    
-    qDebug() << "Successfully moved player" << player.name << "in the internal data model.";
 }
 
 void TeamAssemblyDialog::autoAssignTeams() {
-    qDebug() << "Auto-Assigning Teams...";
     std::vector<PlayerInfo> allPlayersToAssign;
     // Consolidate from internal models, as UI might not be source of truth during this operation
     for (const auto& p : availablePlayersData) allPlayersToAssign.push_back(p);
@@ -239,8 +231,6 @@ void TeamAssemblyDialog::saveTeams() {
             if (!query.exec()) {
                 qWarning() << "Failed to save team for player" << player.name << "(ID:" << player.id << "):" << query.lastError().text();
                 allSuccessful = false;
-            } else {
-                 qDebug() << "Saved player" << player.name << "to team_id" << teamNumberToSave;
             }
         }
     }
@@ -253,15 +243,12 @@ void TeamAssemblyDialog::saveTeams() {
         if (!query.exec()) {
             qWarning() << "Failed to clear team for player" << player.name << "(ID:" << player.id << "):" << query.lastError().text();
             allSuccessful = false;
-        } else {
-            qDebug() << "Cleared team_id for available player" << player.name;
         }
     }
 
     if (allSuccessful) {
         if (QSqlDatabase::database().commit()) {
             QMessageBox::information(this, tr("Save Successful"), tr("Team assignments have been saved to the database."));
-            qDebug() << "Team assignments saved and transaction committed.";
         } else {
             QMessageBox::critical(this, tr("Transaction Error"), tr("Failed to commit team assignments to the database: %1").arg(QSqlDatabase::database().lastError().text()));
             qWarning() << "Transaction commit failed:" << QSqlDatabase::database().lastError().text();

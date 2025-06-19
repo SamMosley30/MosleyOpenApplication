@@ -42,10 +42,8 @@ void TeamLeaderboardWidget::configureTableView() {
 }
 
 void TeamLeaderboardWidget::refreshData() {
-    qDebug() << "TeamLeaderboardWidget: Refreshing data...";
     leaderboardModel->refreshData();
     updateColumnVisibility();
-    qDebug() << "TeamLeaderboardWidget: Data refreshed.";
 }
 
 void TeamLeaderboardWidget::updateColumnVisibility() {
@@ -150,6 +148,5 @@ QImage TeamLeaderboardWidget::exportToImage() const {
     painter.drawLine(currentX, padding, currentX, totalHeight - padding);
     
     painter.end();
-    qDebug() << "TeamLeaderboardWidget: Image exported.";
     return image;
 }
