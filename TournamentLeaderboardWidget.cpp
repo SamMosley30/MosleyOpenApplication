@@ -119,7 +119,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
     int headerHeight = 30;
     int rowHeight = 25;
     int padding = 15;
-    QVector<int> columnWidths = {50, 150, 60, 70, 70, 70, 70, 70, 70, 100}; 
+    QVector<int> columnWidths = {50, 110, 110, 110, 110, 110, 110, 110, 110, 100}; 
 
     int totalWidth = padding * 2;
     for(int i=0; i < colCount; ++i) {
@@ -134,34 +134,31 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
     QImage image(totalWidth, totalHeight, QImage::Format_ARGB32);
     image.fill(Qt::white);
     QPainter painter(&image);
+    painter.setPen(Qt::white);
     painter.setRenderHint(QPainter::Antialiasing);
 
     QString leaderboardTitle = "Leaderboard"; // Generic title
     // Potentially get a more specific title if the dialog sets one on the widget
-    if (!this->windowTitle().isEmpty() && this->windowTitle() != "QWidget") { // Basic check
-        leaderboardTitle = this->windowTitle(); // Or a dedicated title property
-    } else {
-         // Try to infer from model context if possible and if model is TournamentLeaderboardModel
-        const TournamentLeaderboardModel* tlm = qobject_cast<const TournamentLeaderboardModel*>(leaderboardModel);
-        if (tlm) {
-            // This requires TournamentLeaderboardModel to have a public getter for its context
-            // e.g. if (tlm->getTournamentContext() == TournamentLeaderboardModel::MosleyOpen) leaderboardTitle = "Mosley Open";
-            // else if (tlm->getTournamentContext() == TournamentLeaderboardModel::TwistedCreek) leaderboardTitle = "Twisted Creek";
-        }
-    }
+    if (!this->windowTitle().isEmpty() && this->windowTitle() != "QWidget") 
+        leaderboardTitle = this->windowTitle();
+    else if (leaderboardModel->getTournamentContext() == TournamentLeaderboardModel::MosleyOpen) 
+        leaderboardTitle = "Mosley Open";
+    else if (leaderboardModel->getTournamentContext() == TournamentLeaderboardModel::TwistedCreek) 
+        leaderboardTitle = "Twisted Creek";
 
-
-    painter.setFont(QFont("Arial", 14, QFont::Bold));
+    painter.setFont(QFont("Arial", 16, QFont::Bold));
     QRect titleRect(padding, padding, totalWidth - 2 * padding, titleHeight);
+    painter.fillRect(titleRect, Qt::black);
     painter.drawText(titleRect, Qt::AlignCenter, leaderboardTitle);
 
-    painter.setFont(QFont("Arial", 10, QFont::Bold));
+    painter.setFont(QFont("Arial", 12, QFont::Bold));
     int currentX = padding;
     int currentY = padding + titleHeight;
     for (int col = 0; col < colCount; ++col) {
         if (leaderboardView->isColumnHidden(col)) continue;
         int colWidth = (col < columnWidths.size()) ? columnWidths.at(col) : 80;
         QRect headerRect(currentX, currentY, colWidth, headerHeight);
+        painter.fillRect(headerRect, Qt::black);
         painter.drawText(headerRect, 
                          static_cast<Qt::AlignmentFlag>(leaderboardModel->headerData(col, Qt::Horizontal, Qt::TextAlignmentRole).toInt()),
                          leaderboardModel->headerData(col, Qt::Horizontal, Qt::DisplayRole).toString());
@@ -169,10 +166,14 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
     }
 
     painter.setFont(QFont("Arial", 9));
+    painter.setPen(Qt::black);
+    painter.drawLine(padding, padding, totalWidth - padding, padding);
     currentY += headerHeight;
     for (int row = 0; row < rowCount; ++row) {
         currentX = padding;
         QColor rowColor = (row % 2 == 0) ? Qt::white : QColor(240, 240, 240);
+        if (leaderboardModel->data(leaderboardModel->index(row, 0), Qt::DisplayRole).toInt() <= 3)
+            rowColor = QColor(255, 165, 0, 255);
         
         int visibleRowWidth = 0;
         for(int col_idx = 0; col_idx < colCount; ++col_idx) {
@@ -181,7 +182,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
             }
         }
         painter.fillRect(padding, currentY, visibleRowWidth, rowHeight, rowColor);
-
+        painter.drawLine(currentX, currentY + rowHeight, totalWidth - padding, currentY + rowHeight);
 
         for (int col = 0; col < colCount; ++col) {
             if (leaderboardView->isColumnHidden(col)) continue;
@@ -194,6 +195,18 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
         }
         currentY += rowHeight;
     }
+
+    // Draw the vertical lines
+    currentX = padding;
+    currentY = padding + titleHeight + headerHeight;
+    painter.drawLine(currentX, padding, currentX, totalHeight - padding);
+    for (int col = 0; col < colCount; ++col) {
+        if (leaderboardView->isColumnHidden(col)) continue;
+        int colWidth = (col < columnWidths.size()) ? columnWidths.at(col) : 80;
+        painter.drawLine(currentX, currentY, currentX, totalHeight - padding);
+        currentX += colWidth;
+    }
+    painter.drawLine(currentX, padding, currentX, totalHeight - padding);
     
     painter.end();
     qDebug() << "TournamentLeaderboardWidget instance" << this << ": Image exported.";

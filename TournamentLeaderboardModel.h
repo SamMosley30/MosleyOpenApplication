@@ -51,6 +51,7 @@ public:
     QSet<int> getDaysWithScores() const;
 
     void setTournamentContext(TournamentContext context);
+    TournamentContext getTournamentContext() const { return m_tournamentContext; };
     void setCutLineScore(int score);
     void setIsCutApplied(bool applied);
     

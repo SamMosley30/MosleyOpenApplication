@@ -128,13 +128,14 @@ QImage DailyLeaderboardWidget::exportToImage() const
 
     // --- Set Drawing Properties ---
     painter.setRenderHint(QPainter::Antialiasing); // Optional: for smoother text/lines
-    painter.setPen(Qt::black); // Default pen color
+    painter.setPen(Qt::white); // Default pen color
 
     // --- Draw Content ---
 
     // Draw Title
     painter.setFont(QFont("Arial", 16, QFont::Bold));
     QRect titleRect(padding, padding, totalWidth - padding * 2, titleHeight);
+    painter.fillRect(titleRect, Qt::black); // Fill with black background
     painter.drawText(titleRect, Qt::AlignCenter, QString("Day %1 Leaderboard").arg(m_dayNum)); // Title includes day number
 
 
@@ -145,6 +146,7 @@ QImage DailyLeaderboardWidget::exportToImage() const
 
     for (int i = 0; i < colCount; ++i) { // Iterate through all model columns (should be 4)
         QRect headerRect(currentX, currentY, columnWidths.at(i), headerHeight); // Use estimated width
+        painter.fillRect(headerRect, Qt::black); // Fill with black background
         painter.drawText(headerRect, static_cast<Qt::AlignmentFlag>(leaderboardModel->headerData(i, Qt::Horizontal, Qt::TextAlignmentRole).toInt()),
                          leaderboardModel->headerData(i, Qt::Horizontal, Qt::DisplayRole).toString());
         currentX += columnWidths.at(i); // Move X position by the width of this column
@@ -153,6 +155,7 @@ QImage DailyLeaderboardWidget::exportToImage() const
 
     // Draw Data Rows
     painter.setFont(QFont("Arial", 10)); // Font for data
+    painter.setPen(Qt::black);
     currentY += headerHeight; // Start drawing rows below headers
 
     for (int row = 0; row < rowCount; ++row) {
@@ -165,9 +168,8 @@ QImage DailyLeaderboardWidget::exportToImage() const
         QVariant rankData = leaderboardModel->data(leaderboardModel->index(row, leaderboardModel->getColumnForRank()), Qt::DisplayRole);
         bool ok;
         int rank = rankData.toInt(&ok);
-        if (ok && rank >= 1 && rank <= 3) {
-            rowColor = Qt::yellow; // Top 3 are yellow
-        }
+        if (ok && rank >= 1 && rank <= 3)
+            rowColor = QColor(255, 165, 0, 255); // Top 3 are yellow
 
         // Fill row background (covers the entire width)
         painter.fillRect(padding, currentY, totalWidth - padding * 2, rowHeight, rowColor);
@@ -185,7 +187,7 @@ QImage DailyLeaderboardWidget::exportToImage() const
     }
 
     // Optional: Draw grid lines or borders
-    painter.setPen(Qt::gray); // Set a lighter pen for grid lines
+    painter.setPen(Qt::black); // Set a lighter pen for grid lines
     // Draw horizontal lines
     currentY = padding + titleHeight + headerHeight;
     for (int row = 0; row <= rowCount; ++row) { // Draw line above headers and below each row

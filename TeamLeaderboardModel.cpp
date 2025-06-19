@@ -3,12 +3,15 @@
 #include <QSqlError>
 #include <algorithm> // For std::sort, std::greater, std::max_element
 #include <cmath>     // For std::ceil
+#include <ranges>
+#include <functional>
+#include <numeric>
 
 TeamLeaderboardModel::TeamLeaderboardModel(const QString &connectionName, QObject *parent)
     : QAbstractTableModel(parent), m_connectionName(connectionName) {
-    // Initialize leaderboard data for 4 teams
-    m_leaderboardData.resize(5);
-    for (int i = 0; i < 5; ++i) {
+    // Initialize leaderboard data for 6 teams
+    m_leaderboardData.resize(6);
+    for (int i = 0; i < 6; ++i) {
         m_leaderboardData[i].teamId = i + 1;
         // Initial name, will be overwritten by determineTeamNames()
         m_leaderboardData[i].teamName = QString("Team %1 (Unassigned)").arg(i + 1); 
@@ -25,7 +28,7 @@ QSqlDatabase TeamLeaderboardModel::database() const {
 
 int TeamLeaderboardModel::rowCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return m_leaderboardData.size(); // Always 5 teams
+    return m_leaderboardData.size(); // Always 6 teams
 }
 
 int TeamLeaderboardModel::columnCount(const QModelIndex &parent) const {
@@ -56,7 +59,6 @@ QVariant TeamLeaderboardModel::data(const QModelIndex &index, int role) const {
             default: return QVariant();
         }
     } else if (role == Qt::TextAlignmentRole) {
-        if (index.column() == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter); 
         return QVariant(Qt::AlignCenter); 
     }
     return QVariant();
@@ -75,7 +77,6 @@ QVariant TeamLeaderboardModel::headerData(int section, Qt::Orientation orientati
         }
     }
     if (role == Qt::TextAlignmentRole && orientation == Qt::Horizontal) {
-        if (section == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
         return QVariant(Qt::AlignCenter);
     }
     return QVariant();
@@ -286,7 +287,7 @@ void TeamLeaderboardModel::calculateTeamLeaderboard() {
                     }
                 }
 
-                std::sort(teamPlayerNetStablefordScoresForHole.begin(), teamPlayerNetStablefordScoresForHole.end(), std::greater<int>());
+                std::ranges::sort(teamPlayerNetStablefordScoresForHole, std::greater<int>());
 
                 int teamHoleScore = 0;
                 for (int k = 0; k < qMin(3, teamPlayerNetStablefordScoresForHole.size()); ++k) {
@@ -296,36 +297,22 @@ void TeamLeaderboardModel::calculateTeamLeaderboard() {
             } 
             teamRow.dailyTeamStablefordPoints[dayNum] = teamDailyTotalStablefordPoints;
         } 
-    } 
-
-    for(TeamLeaderboardRow &teamRow : m_leaderboardData) {
-        teamRow.overallTeamStablefordPoints = 0; 
-        for(int dayPoints : teamRow.dailyTeamStablefordPoints) {
-            teamRow.overallTeamStablefordPoints += dayPoints;
-        }
     }
 
-    QVector<TeamLeaderboardRow*> teamRowsToSort;
-    for(int i=0; i < m_leaderboardData.size(); ++i) teamRowsToSort.append(&m_leaderboardData[i]);
+    std::ranges::for_each(m_leaderboardData, [](TeamLeaderboardRow &teamRow)
+                          { teamRow.overallTeamStablefordPoints = std::ranges::fold_left(teamRow.dailyTeamStablefordPoints, 0, std::plus<>()); });
 
-    std::sort(teamRowsToSort.begin(), teamRowsToSort.end(), [](const TeamLeaderboardRow* a, const TeamLeaderboardRow* b) {
-        return a->overallTeamStablefordPoints > b->overallTeamStablefordPoints;
-    });
+    std::ranges::sort(m_leaderboardData, [](const TeamLeaderboardRow &a, const TeamLeaderboardRow &b)
+                      { return a.overallTeamStablefordPoints > b.overallTeamStablefordPoints; });
 
-    if (!teamRowsToSort.isEmpty()) {
-        for (int i = 0; i < teamRowsToSort.size(); ++i) {
-            if (i > 0 && teamRowsToSort[i]->overallTeamStablefordPoints == teamRowsToSort[i-1]->overallTeamStablefordPoints) {
-                teamRowsToSort[i]->rank = teamRowsToSort[i-1]->rank; 
-            } else {
-                teamRowsToSort[i]->rank = i + 1;
-            }
-        }
+    if (m_leaderboardData.isEmpty())
+        return;
+
+    for (int i = 0; i < m_leaderboardData.size(); ++i) 
+    {
+        if (i > 0 && m_leaderboardData[i].overallTeamStablefordPoints == m_leaderboardData[i-1].overallTeamStablefordPoints)
+            m_leaderboardData[i].rank = m_leaderboardData[i-1].rank; 
+        else
+            m_leaderboardData[i].rank = i + 1;
     }
-     qDebug() << "Team leaderboard calculation complete.";
-     for(const auto& teamRow : m_leaderboardData) { 
-         qDebug() << teamRow.teamName << "Overall Pts:" << teamRow.overallTeamStablefordPoints << "Rank:" << teamRow.rank
-                  << "Day1:" << teamRow.dailyTeamStablefordPoints.value(1)
-                  << "Day2:" << teamRow.dailyTeamStablefordPoints.value(2)
-                  << "Day3:" << teamRow.dailyTeamStablefordPoints.value(3);
-     }
 }

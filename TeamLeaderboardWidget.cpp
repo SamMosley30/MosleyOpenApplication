@@ -54,27 +54,25 @@ void TeamLeaderboardWidget::updateColumnVisibility() {
     leaderboardView->setColumnHidden(2, !daysWithScores.contains(1)); // Hide Day 1 if no scores
     leaderboardView->setColumnHidden(3, !daysWithScores.contains(2)); // Hide Day 2 if no scores
     leaderboardView->setColumnHidden(4, !daysWithScores.contains(3)); // Hide Day 3 if no scores
-    qDebug() << "TeamLeaderboardWidget: Column visibility updated based on days with scores:" << daysWithScores;
 }
 
 
 QImage TeamLeaderboardWidget::exportToImage() const {
-    // Basic implementation, can be enhanced like your TournamentLeaderboardWidget::exportToImage
     int rowCount = leaderboardModel->rowCount();
     int colCount = leaderboardModel->columnCount();
 
-    if (rowCount == 0 || colCount == 0) {
+    if (rowCount == 0 || colCount == 0) 
+    {
         qDebug() << "TeamLeaderboardWidget::exportToImage: No data to export.";
-        // QMessageBox::information(const_cast<TeamLeaderboardWidget*>(this), "Export Image", "No data available to export.");
         return QImage();
     }
 
     // Estimate sizes
-    int titleHeight = 50;
-    int headerHeight = 30;
-    int rowHeight = 25;
+    int titleHeight = 200;
+    int headerHeight = 120;
+    int rowHeight = 100;
     int padding = 15;
-    QVector<int> columnWidths = {60, 150, 80, 80, 80, 100}; // Rank, Team, D1, D2, D3, Overall
+    QVector<int> columnWidths = {180, 550, 400, 400, 400, 440}; // Rank, Team, D1, D2, D3, Overall
 
     int totalWidth = padding * 2;
     for(int i=0; i < colCount; ++i) {
@@ -89,30 +87,37 @@ QImage TeamLeaderboardWidget::exportToImage() const {
     image.fill(Qt::white);
     QPainter painter(&image);
     painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::white);
 
     // Title
-    painter.setFont(QFont("Arial", 14, QFont::Bold));
+    painter.setFont(QFont("Arial", 64, QFont::Bold));
     QRect titleRect(padding, padding, totalWidth - 2 * padding, titleHeight);
+    painter.fillRect(titleRect, Qt::black);
     painter.drawText(titleRect, Qt::AlignCenter, "Team Leaderboard");
 
     // Headers
-    painter.setFont(QFont("Arial", 10, QFont::Bold));
+    painter.setFont(QFont("Arial", 48, QFont::Bold));
     int currentX = padding;
     int currentY = padding + titleHeight;
     for (int col = 0; col < colCount; ++col) {
         if (leaderboardView->isColumnHidden(col)) continue;
         QRect headerRect(currentX, currentY, columnWidths.at(col), headerHeight);
+        painter.fillRect(headerRect, Qt::black);
         painter.drawText(headerRect, static_cast<Qt::AlignmentFlag>(leaderboardModel->headerData(col, Qt::Horizontal, Qt::TextAlignmentRole).toInt()),
                          leaderboardModel->headerData(col, Qt::Horizontal, Qt::DisplayRole).toString());
         currentX += columnWidths.at(col);
     }
 
     // Data Rows
-    painter.setFont(QFont("Arial", 9));
+    painter.setFont(QFont("Arial", 36));
+    painter.setPen(Qt::black);
     currentY += headerHeight;
     for (int row = 0; row < rowCount; ++row) {
         currentX = padding;
         QColor rowColor = (row % 2 == 0) ? Qt::white : QColor(240, 240, 240);
+        if (leaderboardModel->data(leaderboardModel->index(row, 0), Qt::DisplayRole).toInt() <= 1)
+            rowColor = QColor(255, 165, 0, 255);
+
         painter.fillRect(padding, currentY, totalWidth - 2 * padding, rowHeight, rowColor);
 
         for (int col = 0; col < colCount; ++col) {
@@ -124,6 +129,25 @@ QImage TeamLeaderboardWidget::exportToImage() const {
         }
         currentY += rowHeight;
     }
+
+    // Draw horizontal lines
+    currentY = padding + titleHeight + headerHeight;
+    for (int row = 0; row <= rowCount; ++row) { // Draw line above headers and below each row
+         painter.drawLine(padding, currentY, totalWidth - padding, currentY);
+         currentY += rowHeight;
+    }
+
+    // Draw the vertical lines
+    currentX = padding;
+    currentY = padding + titleHeight + headerHeight;
+    painter.drawLine(currentX, padding, currentX, totalHeight - padding);
+    for (int col = 0; col < colCount; ++col) {
+        if (leaderboardView->isColumnHidden(col)) continue;
+        int colWidth = (col < columnWidths.size()) ? columnWidths.at(col) : 440;
+        painter.drawLine(currentX, currentY, currentX, totalHeight - padding);
+        currentX += colWidth;
+    }
+    painter.drawLine(currentX, padding, currentX, totalHeight - padding);
     
     painter.end();
     qDebug() << "TeamLeaderboardWidget: Image exported.";

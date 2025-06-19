@@ -16,6 +16,7 @@
         "qtwidgets": "cpp",
         "chrono": "cpp",
         "variant": "cpp",
-        "span": "cpp"
+        "span": "cpp",
+        "ranges": "cpp"
     }
 }

@@ -8,7 +8,7 @@
 
 TeamAssemblyDialog::TeamAssemblyDialog(QSqlDatabase &db, QWidget *parent)
     : QDialog(parent), database(db) {
-    teamsData.resize(5); // Initialize for 5 teams
+    teamsData.resize(6); // Initialize for 6 teams
     setupUI();
     loadActivePlayers(); // Load initial players and their persisted team assignments
 
@@ -41,7 +41,7 @@ void TeamAssemblyDialog::setupUI() {
     // Teams Section
     QHBoxLayout *teamsLayout = new QHBoxLayout(); 
 
-    for (int i = 0; i < 5; ++i) {
+    for (int i = 0; i < 6; ++i) {
         QGroupBox *teamXGroupBox = new QGroupBox(tr("Team %1").arg(i + 1)); 
         QVBoxLayout *teamXLayout = new QVBoxLayout(teamXGroupBox);
         PlayerListWidget *teamXListWidget = new PlayerListWidget(this);
@@ -103,7 +103,7 @@ void TeamAssemblyDialog::loadActivePlayers() {
                 teamId = teamIdVariant.toInt();
             }
 
-            if (teamId >= 1 && teamId <= 5) { // Player is assigned to a valid team (1-5)
+            if (teamId >= 1 && teamId <= 6) { // Player is assigned to a valid team (1-6)
                 int teamIndex = teamId - 1; // Convert to 0-based index
                 if (teamIndex < teamsData.size()) {
                     teamsData[teamIndex].push_back(player);
@@ -230,7 +230,7 @@ void TeamAssemblyDialog::saveTeams() {
 
     // Update players assigned to teams
     for (size_t i = 0; i < teamsData.size(); ++i) {
-        int teamNumberToSave = i + 1; // Team ID in DB will be 1, 2, 3, 4, 5
+        int teamNumberToSave = i + 1; // Team ID in DB will be 1, 2, 3, 4, 5, 6
         for (const auto& player : teamsData[i]) {
             QSqlQuery query(database);
             query.prepare("UPDATE players SET team_id = :teamId WHERE id = :playerId");

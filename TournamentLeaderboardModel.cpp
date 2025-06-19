@@ -112,7 +112,6 @@ QVariant TournamentLeaderboardModel::data(const QModelIndex &index, int role) co
             default: return QVariant();
         }
     } else if (role == Qt::TextAlignmentRole) {
-        if (index.column() == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
         return QVariant(Qt::AlignCenter);
     }
     return QVariant();
@@ -123,7 +122,7 @@ QVariant TournamentLeaderboardModel::headerData(int section, Qt::Orientation ori
         switch (section) {
             case 0: return "Rank";
             case 1: return "Player";
-            case 2: return "Actual Hcp"; 
+            case 2: return "Point Target"; 
             case 3: return "Day 1 Gross";
             case 4: return "Day 1 Net";
             case 5: return "Day 2 Gross";
@@ -135,7 +134,6 @@ QVariant TournamentLeaderboardModel::headerData(int section, Qt::Orientation ori
         }
     }
     if (role == Qt::TextAlignmentRole && orientation == Qt::Horizontal) {
-        if (section == 1) return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
         return QVariant(Qt::AlignCenter);
     }
     return QVariant();
