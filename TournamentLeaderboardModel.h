@@ -83,13 +83,7 @@ private:
     void calculateAllPlayerTwoDayMosleyNetScores(); // Calculates m_playerTwoDayMosleyNetScoreForCut
     void calculateLeaderboard(); 
 
-    int calculateNetStablefordPointsForHole(
-        int grossScore, 
-        int par, 
-        int playerActualDatabaseHandicap, 
-        int holeHandicapIndex,
-        TournamentContext contextForCalc // Which handicap rule to apply for THIS calculation
-    ) const;
+    int calculateNetStablefordPointsForHole(int grossScore, int par) const;
 };
 
 #endif // TOURNAMENTLEADERBOARDMODEL_H

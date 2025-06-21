@@ -9,6 +9,7 @@ qt_standard_project_setup()
 
 set(APP_SOURCES 
     main.cpp
+    utils.h
     CommonStructs.h
     MainWindow.h
     MainWindow.cpp
@@ -47,6 +48,8 @@ set(APP_SOURCES
 )
 
 qt_add_executable(MosleyOpen ${APP_SOURCES})
+
+target_compile_options(MosleyOpen PRIVATE -fmodules-ts)
 
 target_link_libraries(MosleyOpen PRIVATE Qt6::Widgets Qt6::Sql)
 

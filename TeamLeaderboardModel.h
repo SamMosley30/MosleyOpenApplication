@@ -59,7 +59,6 @@ private:
     std::optional<int> getPlayerNetStablefordForHole(const PlayerInfo& member, int dayNum, int holeNum) const;
     int calculateTeamScoreForHole(TeamLeaderboardRow & teamRow, int dayNum, int holeNum) const;
     void calculateTeamLeaderboard();
-    int calculateStablefordPoints(int score, int par) const; // Assuming this is the basic one, not the complex per-player one
 };
 
 #endif // TEAMLEADERBOARDMODEL_H

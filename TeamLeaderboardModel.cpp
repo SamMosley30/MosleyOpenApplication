@@ -1,4 +1,5 @@
 #include "TeamLeaderboardModel.h"
+#include "utils.h"
 #include <QSqlQuery>
 #include <QSqlError>
 #include <algorithm> // For std::sort, std::greater, std::max_element
@@ -219,20 +220,6 @@ void TeamLeaderboardModel::fetchAllScores() {
     }
 }
 
-int TeamLeaderboardModel::calculateStablefordPoints(int score, int par) const {
-
-    if (score <= 0 || par <= 0) return 0;
-    int diff = score - par; // Assuming 'score' is already adjusted for handicap for this player
-    if (diff <= -3) return 8; 
-    if (diff == -2) return 6; 
-    if (diff == -1) return 4; 
-    if (diff == 0) return 2;  
-    if (diff == 1) return 1;  
-    if (diff == 2) return 0;  
-    if (diff >= 3) return -1; 
-    return 0;
-}
-
 // Helper to get a single player's net stableford score for a specific hole.
 // Returns an empty optional if the player has no score for that hole.
 std::optional<int> TeamLeaderboardModel::getPlayerNetStablefordForHole(
@@ -263,7 +250,11 @@ std::optional<int> TeamLeaderboardModel::getPlayerNetStablefordForHole(
     int netPlayerScore = playerScoreGross - strokesReceived;
     
     // Pass the calculated net score to the basic Stableford points function
-    return calculateStablefordPoints(netPlayerScore, par);
+    if (stableford_conversion.contains(netPlayerScore - par))
+        return stableford_conversion.at(netPlayerScore - par);
+    else
+        qDebug() << "Invalid score " << netPlayerScore << "on par " << par;
+        return std::nullopt;
 }
 
 int TeamLeaderboardModel::calculateTeamScoreForHole(TeamLeaderboardRow &team, int dayNum, int holeNum) const

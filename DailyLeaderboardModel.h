@@ -71,9 +71,6 @@ private:
     // Method to perform Stableford calculations and ranking for the day
     void calculateLeaderboard();
 
-    // Helper to calculate Stableford points for a single hole score
-    int calculateStablefordPoints(int score, int par) const; // Same logic as TournamentModel
-
     // Helper to get DailyLeaderboardRow by row index in m_leaderboardData
     const DailyLeaderboardRow* getLeaderboardRow(int row) const;
     // Add helpers for other columns if added to DailyLeaderboardRow

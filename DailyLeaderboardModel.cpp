@@ -1,4 +1,5 @@
 #include "dailyleaderboardmodel.h"
+#include "utils.h"
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QSqlRecord>
@@ -66,24 +67,11 @@ QVariant DailyLeaderboardModel::data(const QModelIndex &index, int role) const
         if (index.column() == getColumnForPlayerName()) return rowData->playerName;
         if (index.column() == getColumnForDailyTotalPoints()) return rowData->dailyTotalPoints;
         if (index.column() == getColumnForDailyNetPoints()) return rowData->dailyNetPoints;
-
-        // Add cases for other columns if added to DailyLeaderboardRow
     }
 
     // Handle other roles like TextAlignmentRole
-    if (role == Qt::TextAlignmentRole) {
-        if (index.column() == getColumnForRank() ||
-            index.column() == getColumnForDailyTotalPoints() ||
-            index.column() == getColumnForDailyNetPoints())
-        {
-            return static_cast<int>(Qt::AlignCenter); // Center align numeric columns
-        }
-        if (index.column() == getColumnForPlayerName())
-        {
-            return static_cast<int>(Qt::AlignLeft | Qt::AlignVCenter); // Left align name
-        }
-    }
-    // Add other roles like BackgroundRole, ForegroundRole, etc.
+    if (role == Qt::TextAlignmentRole)
+        return static_cast<int>(Qt::AlignCenter); // Center align numeric columns
 
     return QVariant(); // Return an invalid QVariant for roles we don't handle
 }
@@ -92,35 +80,17 @@ QVariant DailyLeaderboardModel::data(const QModelIndex &index, int role) const
 QVariant DailyLeaderboardModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
     // We only handle DisplayRole for headers
-    if (role == Qt::DisplayRole)
+    if (role == Qt::DisplayRole and orientation == Qt::Horizontal)
     {
-        if (orientation == Qt::Horizontal) // Column headers
-        {
-            if (section == getColumnForRank()) return "Rank";
-            if (section == getColumnForPlayerName()) return "Player";
-            if (section == getColumnForDailyTotalPoints()) return QString("Day %1 Total").arg(m_dayNum);
-            if (section == getColumnForDailyNetPoints()) return QString("Day %1 Net").arg(m_dayNum);
-
-            // Add headers for other columns if added to DailyLeaderboardRow
-        }
-        // Vertical headers are usually not needed for leaderboards
+        if (section == getColumnForRank()) return "Rank";
+        if (section == getColumnForPlayerName()) return "Player";
+        if (section == getColumnForDailyTotalPoints()) return QString("Day %1 Total").arg(m_dayNum);
+        if (section == getColumnForDailyNetPoints()) return QString("Day %1 Net").arg(m_dayNum);
     }
 
     // Handle other roles like TextAlignmentRole for headers
-    if (role == Qt::TextAlignmentRole) {
-         if (orientation == Qt::Horizontal) {
-            if (section == getColumnForRank() ||
-                section == getColumnForDailyTotalPoints() ||
-                section == getColumnForDailyNetPoints())
-            {
-                return static_cast<int>(Qt::AlignCenter); // Center align numeric column headers
-            }
-            if (section == getColumnForPlayerName())
-            {
-                return static_cast<int>(Qt::AlignLeft | Qt::AlignVCenter); // Left align name header
-            }
-         }
-    }
+    if (role == Qt::TextAlignmentRole and orientation == Qt::Horizontal)
+            return static_cast<int>(Qt::AlignCenter); // Center align numeric column headers
 
     return QVariant(); // Return an invalid QVariant for roles/orientations we don't handle
 }
@@ -262,8 +232,10 @@ void DailyLeaderboardModel::calculateLeaderboard()
                     int par = m_allHoleDetails[qMakePair(courseIdForScore, holeNum)].first; // Get Par
 
                     // Calculate Stableford points for this hole
-                    int points = calculateStablefordPoints(score, par);
-                    row.dailyTotalPoints += points; // Add to daily total
+                    if (stableford_conversion.contains(score - par))
+                        row.dailyTotalPoints += stableford_conversion.at(score - par);
+                    else
+                        qDebug() << "Invalid score " << score << "on par " << par << "for " << playerInfo.name;
                 } else {
                      qDebug() << QString("DailyLeaderboardModel::calculateLeaderboard (Day %1): Warning: Hole details not found for Course %2 Hole %3").arg(m_dayNum).arg(courseIdForScore).arg(holeNum);
                 }
@@ -297,28 +269,6 @@ void DailyLeaderboardModel::calculateLeaderboard()
     }
 }
 
-// Helper to calculate Stableford points for a single hole score relative to par
-// Rules: Triple Bogey = -1, Double Bogey = 0, Bogey = 1, Par = 2, Birdie = 4, Eagle = 6, Double Eagle = 8
-int DailyLeaderboardModel::calculateStablefordPoints(int score, int par) const
-{
-    if (score <= 0 || par <= 0) {
-        return 0; // Cannot calculate points for unentered score or invalid par
-    }
-
-    int diff = score - par;
-
-    if (diff <= -3) return 8; // Double Eagle or better
-    if (diff == -2) return 6; // Eagle
-    if (diff == -1) return 4; // Birdie
-    if (diff == 0) return 2;  // Par
-    if (diff == 1) return 1;  // Bogey
-    if (diff == 2) return 0;  // Double Bogey
-    if (diff >= 3) return -1; // Triple Bogey or worse
-
-    return 0;
-}
-
-
 // Helper to get DailyLeaderboardRow by row index in m_leaderboardData
 const DailyLeaderboardRow* DailyLeaderboardModel::getLeaderboardRow(int row) const
 {
@@ -327,12 +277,3 @@ const DailyLeaderboardRow* DailyLeaderboardModel::getLeaderboardRow(int row) con
     }
     return nullptr; // Invalid row
 }
-
-// Helper to get the model column index for a specific data type
-// These are simple accessors for clarity
-/*
-int DailyLeaderboardModel::getColumnForRank() const { return 0; }
-int DailyLeaderboardModel::getColumnForPlayerName() const { return 1; }
-int DailyLeaderboardModel::getColumnForDailyTotalPoints() const { return 2; }
-int DailyLeaderboardModel::getColumnForDailyNetPoints() const { return 3; }
-*/

@@ -1,10 +1,13 @@
+#include "utils.h"
 #include "TournamentLeaderboardModel.h"
+
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QSqlRecord>
 #include <QSqlField>
 #include <algorithm>
 #include <cmath> // For std::floor
+#include <ranges>
 
 TournamentLeaderboardModel::TournamentLeaderboardModel(const QString &connectionName, QObject *parent)
     : QAbstractTableModel(parent), m_connectionName(connectionName) // Store the passed connection name
@@ -31,13 +34,10 @@ QSqlDatabase TournamentLeaderboardModel::database() const
                    << "DB connection name '" << m_connectionName << "' is NOT VALID (not found in Qt's list). "
                    << "Available connections:" << QSqlDatabase::connectionNames();
     }
-    else
+    else if (!db_check.isOpen())
     {
-        if (!db_check.isOpen())
-        {
-            qWarning() << "TournamentLeaderboardModel instance" << this
-                       << "DB connection '" << m_connectionName << "' is VALID but NOT OPEN. Last error:" << db_check.lastError().text();
-        }
+        qWarning() << "TournamentLeaderboardModel instance" << this
+                   << "DB connection '" << m_connectionName << "' is VALID but NOT OPEN. Last error:" << db_check.lastError().text();
     }
     return db_check; // Return the retrieved (and possibly not open) connection.
 }
@@ -117,38 +117,24 @@ QVariant TournamentLeaderboardModel::data(const QModelIndex &index, int role) co
 
 QVariant TournamentLeaderboardModel::headerData(int section, Qt::Orientation orientation, int role) const
 {
-    if (role == Qt::DisplayRole && orientation == Qt::Horizontal)
-    {
-        switch (section)
-        {
-        case 0:
-            return "Rank";
-        case 1:
-            return "Player";
-        case 2:
-            return "Point Target";
-        case 3:
-            return "Day 1 Gross";
-        case 4:
-            return "Day 1 Net";
-        case 5:
-            return "Day 2 Gross";
-        case 6:
-            return "Day 2 Net";
-        case 7:
-            return "Day 3 Gross";
-        case 8:
-            return "Day 3 Net";
-        case 9:
-            return "Overall Net";
-        default:
-            return QVariant();
-        }
-    }
-    if (role == Qt::TextAlignmentRole && orientation == Qt::Horizontal)
-    {
+    const std::unordered_map<int, QString> columnNames = {
+        {0, "Rank"},
+        {1, "Player"},
+        {2, "Point Target"},
+        {3, "Day 1 Gross"},
+        {4, "Day 1 Net"},
+        {5, "Day 2 Gross"},
+        {6, "Day 2 Net"},
+        {7, "Day 3 Gross"},
+        {8, "Day 3 Net"},
+        {9, "Overall Net"},
+    };
+
+    if (role == Qt::DisplayRole && orientation == Qt::Horizontal && columnNames.contains(section))
+        return columnNames.at(section);
+    else if (role == Qt::TextAlignmentRole && orientation == Qt::Horizontal)
         return QVariant(Qt::AlignCenter);
-    }
+    
     return QVariant();
 }
 
@@ -269,58 +255,14 @@ void TournamentLeaderboardModel::fetchAllScores()
 }
 
 int TournamentLeaderboardModel::calculateNetStablefordPointsForHole(
-    int grossScore, int par, int playerActualDatabaseHandicap,
-    int holeHandicapIndex, TournamentContext contextForCalc) const
+    int grossScore, int par) const
 {
     if (grossScore <= 0 || par <= 0)
         return 0;
-
-    int handicapForThisCalc = playerActualDatabaseHandicap;
-
-    if (contextForCalc == MosleyOpen)
-    {
-        if (playerActualDatabaseHandicap >= 6 && playerActualDatabaseHandicap <= 15)
-        {
-            handicapForThisCalc = 16;
-        }
-    }
-
-    int strokesReceivedOnThisHole = 0;
-    if (handicapForThisCalc <= 36)
-    {
-        int effectiveStrokesForRound = 36 - handicapForThisCalc;
-        if (effectiveStrokesForRound >= holeHandicapIndex)
-            strokesReceivedOnThisHole++;
-        if (effectiveStrokesForRound >= (18 + holeHandicapIndex))
-            strokesReceivedOnThisHole++;
-        if (effectiveStrokesForRound >= (36 + holeHandicapIndex))
-            strokesReceivedOnThisHole++;
-    }
-    else
-    {
-        double strokesToGiveBackTotalDouble = (static_cast<double>(handicapForThisCalc) - 36.0) / 2.0;
-        int strokesToGiveBackTotal = static_cast<int>(std::floor(strokesToGiveBackTotalDouble));
-        if (holeHandicapIndex > (18 - strokesToGiveBackTotal))
-            strokesReceivedOnThisHole = -1;
-    }
-    int netScore = grossScore - strokesReceivedOnThisHole;
+        
     int diff = grossScore - par;
 
-    if (diff <= -3)
-        return 8;
-    if (diff == -2)
-        return 6;
-    if (diff == -1)
-        return 4;
-    if (diff == 0)
-        return 2;
-    if (diff == 1)
-        return 1;
-    if (diff == 2)
-        return 0;
-    if (diff >= 3)
-        return -1;
-    return 0;
+    return stableford_conversion.at(diff);
 }
 
 void TournamentLeaderboardModel::calculateAllPlayerTwoDayMosleyNetScores()
@@ -331,28 +273,30 @@ void TournamentLeaderboardModel::calculateAllPlayerTwoDayMosleyNetScores()
         qDebug() << "TournamentLeaderboardModel instance" << this << "- calculateAllPlayerTwoDayMosleyNetScores: m_allPlayers is empty. Skipping.";
         return;
     }
+
     for (auto const &[playerId, playerInfo] : m_allPlayers.asKeyValueRange())
     {
         int twoDayTotalNetForPlayer = 0;
         for (int dayNum = 1; dayNum <= 2; ++dayNum)
         {
-            if (m_allScores.contains(playerId) && m_allScores[playerId].contains(dayNum))
+            if (!m_allScores.contains(playerId)) continue;
+
+            if (!m_allScores[playerId].contains(dayNum)) continue;
+
+            for (auto const &[holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange())
             {
-                for (auto const &[holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange())
-                {
-                    int grossScore = scoreAndCourse.first;
-                    int courseIdForScore = scoreAndCourse.second;
-                    QPair<int, int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
-                    if (m_holeParAndHandicapIndex.contains(holeDetailsKey))
-                    {
-                        int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
-                        int holeHcIdx = m_holeParAndHandicapIndex[holeDetailsKey].second;
-                        twoDayTotalNetForPlayer += calculateNetStablefordPointsForHole(
-                            grossScore, par, playerInfo.handicap, holeHcIdx, MosleyOpen);
-                    }
-                }
-                twoDayTotalNetForPlayer -= playerInfo.handicap;
+                int grossScore = scoreAndCourse.first;
+                int courseIdForScore = scoreAndCourse.second;
+                QPair<int, int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
+                if (!m_holeParAndHandicapIndex.contains(holeDetailsKey)) continue;
+                
+                int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
+                if (stableford_conversion.contains(grossScore - par))
+                    twoDayTotalNetForPlayer += stableford_conversion.at(grossScore - par);
+                else
+                    qDebug() << "Invalid score " << grossScore << "on par " << par << "for " << playerInfo.name;
             }
+            twoDayTotalNetForPlayer -= std::max(16, playerInfo.handicap);
         }
         m_playerTwoDayMosleyNetScoreForCut[playerId] = twoDayTotalNetForPlayer;
     }
@@ -364,118 +308,87 @@ void TournamentLeaderboardModel::calculateLeaderboard()
 
     for (auto const &[playerId, playerInfo] : m_allPlayers.asKeyValueRange())
     {
-        bool includePlayer = false;
         int playerTwoDayMosleyScore = m_playerTwoDayMosleyNetScoreForCut.value(playerId, 0);
 
-        if (m_isCutApplied)
+        bool madeTheCut = m_isCutApplied and playerTwoDayMosleyScore >= m_cutLineScore;
+        bool includePlayer = !m_isCutApplied or 
+                             (madeTheCut and m_tournamentContext == MosleyOpen) or 
+                             (!madeTheCut and m_tournamentContext == TwistedCreek);
+
+        if (!includePlayer) continue;
+
+        LeaderboardRow row;
+        row.playerId = playerId;
+        row.playerName = playerInfo.name;
+        row.playerActualDbHandicap = playerInfo.handicap;
+        row.totalNetStablefordPoints = 0;
+        row.twoDayMosleyNetScoreForCut = playerTwoDayMosleyScore;
+
+        for (int dayNum = 1; dayNum <= 3; ++dayNum)
         {
+            int dailyGrossPts = 0;
+
+            if (!m_allScores.contains(playerId)) continue;
+            if (!m_allScores[playerId].contains(dayNum)) continue;
+
+            for (auto const &[holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange())
+            {
+                int grossScore = scoreAndCourse.first;
+                int courseIdForScore = scoreAndCourse.second;
+                QPair<int, int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
+                if (m_holeParAndHandicapIndex.contains(holeDetailsKey))
+                {
+                    int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
+
+                    if (stableford_conversion.contains(grossScore - par))
+                        dailyGrossPts += stableford_conversion.at(grossScore - par);
+                    else
+                        qDebug() << "Invalid score " << grossScore << "on par " << par << "for " << playerInfo.name;
+                }
+            }
+
+            row.dailyGrossStablefordPoints[dayNum] = dailyGrossPts;
             if (m_tournamentContext == MosleyOpen)
-            {
-                if (playerTwoDayMosleyScore >= m_cutLineScore)
-                    includePlayer = true;
-            }
-            else if (m_tournamentContext == TwistedCreek)
-            {
-                if (playerTwoDayMosleyScore < m_cutLineScore)
-                    includePlayer = true;
-            }
+                row.dailyNetStablefordPoints[dayNum] = dailyGrossPts - std::max(16, playerInfo.handicap);
+            else
+                row.dailyNetStablefordPoints[dayNum] = dailyGrossPts - playerInfo.handicap;
+            row.totalNetStablefordPoints += row.dailyNetStablefordPoints[dayNum];
         }
-        else
-            includePlayer = true;
-
-        if (includePlayer)
-        {
-            LeaderboardRow row;
-            row.playerId = playerId;
-            row.playerName = playerInfo.name;
-            row.playerActualDbHandicap = playerInfo.handicap;
-            row.totalNetStablefordPoints = 0;
-            row.twoDayMosleyNetScoreForCut = playerTwoDayMosleyScore;
-
-            for (int dayNum = 1; dayNum <= 3; ++dayNum)
-            {
-                int dailyGrossPts = 0;
-                bool scoresExistForDay = false;
-
-                if (m_allScores.contains(playerId) && m_allScores[playerId].contains(dayNum))
-                {
-                    scoresExistForDay = true;
-                    for (auto const &[holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange())
-                    {
-                        int grossScore = scoreAndCourse.first;
-                        int courseIdForScore = scoreAndCourse.second;
-                        QPair<int, int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
-                        if (m_holeParAndHandicapIndex.contains(holeDetailsKey))
-                        {
-                            int par = m_holeParAndHandicapIndex[holeDetailsKey].first;
-                            int holeHcIdx = m_holeParAndHandicapIndex[holeDetailsKey].second;
-
-                            int grossStablefordDiff = grossScore - par;
-                            if (grossStablefordDiff <= -3)
-                                dailyGrossPts += 8;
-                            else if (grossStablefordDiff == -2)
-                                dailyGrossPts += 6;
-                            else if (grossStablefordDiff == -1)
-                                dailyGrossPts += 4;
-                            else if (grossStablefordDiff == 0)
-                                dailyGrossPts += 2;
-                            else if (grossStablefordDiff == 1)
-                                dailyGrossPts += 1;
-                            else if (grossStablefordDiff == 2)
-                                dailyGrossPts += 0;
-                            else if (grossStablefordDiff >= 3)
-                                dailyGrossPts += -1;
-                        }
-                    }
-                }
-                if (scoresExistForDay)
-                {
-                    row.dailyGrossStablefordPoints[dayNum] = dailyGrossPts;
-                    row.dailyNetStablefordPoints[dayNum] = dailyGrossPts - playerInfo.handicap;
-                    row.totalNetStablefordPoints += row.dailyNetStablefordPoints[dayNum];
-                }
-            }
-            m_leaderboardData.append(row);
-        }
+        m_leaderboardData.append(row);
     }
 
-    std::sort(m_leaderboardData.begin(), m_leaderboardData.end(),
-              [](const LeaderboardRow &a, const LeaderboardRow &b)
-              {
-                  return a.totalNetStablefordPoints > b.totalNetStablefordPoints;
-              });
+    std::ranges::sort(m_leaderboardData,
+                      [](const auto &a, const auto &b)
+                      { return a.totalNetStablefordPoints > b.totalNetStablefordPoints; });
 
-    if (!m_leaderboardData.isEmpty())
+    if (m_leaderboardData.isEmpty()) return;
+    
+    m_leaderboardData[0].rank = 1;
+    for (int i = 1; i < m_leaderboardData.size(); ++i)
     {
-        m_leaderboardData[0].rank = 1;
-        for (int i = 1; i < m_leaderboardData.size(); ++i)
-        {
-            if (m_leaderboardData[i].totalNetStablefordPoints == m_leaderboardData[i - 1].totalNetStablefordPoints)
-                m_leaderboardData[i].rank = m_leaderboardData[i - 1].rank;
-            else
-                m_leaderboardData[i].rank = i + 1;
-        }
+        if (m_leaderboardData[i].totalNetStablefordPoints == m_leaderboardData[i - 1].totalNetStablefordPoints)
+            m_leaderboardData[i].rank = m_leaderboardData[i - 1].rank;
+        else
+            m_leaderboardData[i].rank = i + 1;
     }
 }
 
 int TournamentLeaderboardModel::getColumnForDailyGrossPoints(int dayNum) const
 {
-    if (dayNum == 1)
-        return 3;
-    if (dayNum == 2)
-        return 5;
-    if (dayNum == 3)
-        return 7;
-    return -1;
+    const std::unordered_map<int, int> columnMap = {
+        {1, 3},
+        {2, 5},
+        {3, 7},
+    };
+    return columnMap.contains(dayNum) ? columnMap.at(dayNum) : -1;
 }
 
 int TournamentLeaderboardModel::getColumnForDailyNetPoints(int dayNum) const
 {
-    if (dayNum == 1)
-        return 4;
-    if (dayNum == 2)
-        return 6;
-    if (dayNum == 3)
-        return 8;
-    return -1;
+    const std::unordered_map<int, int> columnMap = {
+        {1, 4},
+        {2, 6},
+        {3, 8},
+    };
+    return columnMap.contains(dayNum) ? columnMap.at(dayNum) : -1;
 }
