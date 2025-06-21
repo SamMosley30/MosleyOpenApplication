@@ -78,17 +78,17 @@ QImage DailyLeaderboardWidget::exportToImage() const
     }
 
     // Estimate sizes (adjust these values based on desired appearance)
-    int titleHeight = 60;
-    int headerHeight = 40;
-    int rowHeight = 30;
-    int padding = 20; // Padding around content
+    int titleHeight = 120;
+    int headerHeight = 80;
+    int rowHeight = 60;
+    int padding = 0; // Padding around content
 
     // Estimate column widths (matching the model's columns)
     QVector<int> columnWidths;
-    columnWidths << 60;  // Rank
-    columnWidths << 250; // Player Name
-    columnWidths << 100; // Daily Total
-    columnWidths << 100; // Daily Net
+    columnWidths << 120;  // Rank
+    columnWidths << 400; // Player Name
+    columnWidths << 200; // Daily Total
+    columnWidths << 200; // Daily Net
 
     // Calculate total width based on column widths
     int totalWidth = padding * 2; // Left and right padding
@@ -128,13 +128,13 @@ QImage DailyLeaderboardWidget::exportToImage() const
     // --- Draw Content ---
 
     // Draw Title
-    painter.setFont(QFont("Arial", 16, QFont::Bold));
+    painter.setFont(QFont("Arial", 32, QFont::Bold));
     QRect titleRect(padding, padding, totalWidth - padding * 2, titleHeight);
     painter.fillRect(titleRect, Qt::black);                                                    // Fill with black background
     painter.drawText(titleRect, Qt::AlignCenter, QString("Day %1 Leaderboard").arg(m_dayNum)); // Title includes day number
 
     // Draw Headers
-    painter.setFont(QFont("Arial", 12, QFont::Bold));
+    painter.setFont(QFont("Arial", 24, QFont::Bold));
     int currentX = padding;
     int currentY = padding + titleHeight;
 
@@ -148,7 +148,7 @@ QImage DailyLeaderboardWidget::exportToImage() const
     }
 
     // Draw Data Rows
-    painter.setFont(QFont("Arial", 10)); // Font for data
+    painter.setFont(QFont("Arial", 20)); // Font for data
     painter.setPen(Qt::black);
     currentY += headerHeight; // Start drawing rows below headers
 

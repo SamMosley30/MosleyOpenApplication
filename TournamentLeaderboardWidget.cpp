@@ -99,17 +99,17 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
         return QImage();
     }
 
-    int titleHeight = 50;
-    int headerHeight = 30;
-    int rowHeight = 25;
+    int titleHeight = 100;
+    int headerHeight = 60;
+    int rowHeight = 50;
     int padding = 15;
-    QVector<int> columnWidths = {50, 110, 110, 110, 110, 110, 110, 110, 110, 100}; 
+    QVector<int> columnWidths = {100, 220, 220, 220, 220, 220, 220, 220, 220, 200}; 
 
     int totalWidth = padding * 2;
     for(int i=0; i < colCount; ++i) {
         if (!leaderboardView->isColumnHidden(i)) {
             if (i < columnWidths.size()) totalWidth += columnWidths.at(i);
-            else totalWidth += 80; 
+            else totalWidth += 220; 
         }
     }
     
@@ -130,12 +130,12 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
     else if (leaderboardModel->getTournamentContext() == TournamentLeaderboardModel::TwistedCreek) 
         leaderboardTitle = "Twisted Creek";
 
-    painter.setFont(QFont("Arial", 16, QFont::Bold));
+    painter.setFont(QFont("Arial", 32, QFont::Bold));
     QRect titleRect(padding, padding, totalWidth - 2 * padding, titleHeight);
     painter.fillRect(titleRect, Qt::black);
     painter.drawText(titleRect, Qt::AlignCenter, leaderboardTitle);
 
-    painter.setFont(QFont("Arial", 12, QFont::Bold));
+    painter.setFont(QFont("Arial", 24, QFont::Bold));
     int currentX = padding;
     int currentY = padding + titleHeight;
     for (int col = 0; col < colCount; ++col) {
@@ -149,7 +149,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
         currentX += colWidth;
     }
 
-    painter.setFont(QFont("Arial", 9));
+    painter.setFont(QFont("Arial", 18));
     painter.setPen(Qt::black);
     painter.drawLine(padding, padding, totalWidth - padding, padding);
     currentY += headerHeight;
@@ -162,7 +162,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
         int visibleRowWidth = 0;
         for(int col_idx = 0; col_idx < colCount; ++col_idx) {
             if(!leaderboardView->isColumnHidden(col_idx)) {
-                 visibleRowWidth += (col_idx < columnWidths.size()) ? columnWidths.at(col_idx) : 80;
+                 visibleRowWidth += (col_idx < columnWidths.size()) ? columnWidths.at(col_idx) : 220;
             }
         }
         painter.fillRect(padding, currentY, visibleRowWidth, rowHeight, rowColor);
@@ -170,7 +170,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
 
         for (int col = 0; col < colCount; ++col) {
             if (leaderboardView->isColumnHidden(col)) continue;
-            int colWidth = (col < columnWidths.size()) ? columnWidths.at(col) : 80;
+            int colWidth = (col < columnWidths.size()) ? columnWidths.at(col) : 220;
             QRect dataRect(currentX, currentY, colWidth, rowHeight);
             painter.drawText(dataRect, 
                              static_cast<Qt::AlignmentFlag>(leaderboardModel->data(leaderboardModel->index(row, col), Qt::TextAlignmentRole).toInt()),
@@ -186,7 +186,7 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
     painter.drawLine(currentX, padding, currentX, totalHeight - padding);
     for (int col = 0; col < colCount; ++col) {
         if (leaderboardView->isColumnHidden(col)) continue;
-        int colWidth = (col < columnWidths.size()) ? columnWidths.at(col) : 80;
+        int colWidth = (col < columnWidths.size()) ? columnWidths.at(col) : 220;
         painter.drawLine(currentX, currentY, currentX, totalHeight - padding);
         currentX += colWidth;
     }
