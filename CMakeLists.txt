@@ -56,46 +56,51 @@ target_link_libraries(MosleyOpen PRIVATE Qt6::Widgets Qt6::Sql)
 set(CPACK_PROJECT_NAME ${PROJECT_NAME})
 set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
 
-# --- CPack Installer Configuration ---
-if(WIN32)
-    # Set basic package information
-    set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
-    set(CPACK_PACKAGE_VERSION "${CPACK_PROJECT_VERSION}")
-    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Mosley Open Golf Tournament Manager")
-    set(CPACK_PACKAGE_VENDOR "Sammos")
-    set(CPACK_PACKAGE_CONTACT "your.email@example.com")
-    set(CPACK_NSIS_DISPLAY_NAME "${PROJECT_NAME} ${CPACK_PACKAGE_VERSION}")
-    set(CPACK_NSIS_INSTALLER_ICON_CODE "") # You can add an icon here
-    set(CPACK_NSIS_PACKAGE_NAME "${PROJECT_NAME} ${CPACK_PACKAGE_VERSION}")
+# Define a variable for our clean installation staging area
+set(STAGING_DIR "${CMAKE_BINARY_DIR}/stage")
 
-    # Tell CPack to install the executable and the database file
-    install(TARGETS ${PROJECT_NAME} DESTINATION bin)
-    # Make sure tournament.db is in your project's root directory or provide the full path
-    install(FILES tournament.db DESTINATION bin)
+set(WINDEPLOYQT_EXE "C:/Qt/6.9.0/mingw_64/bin/windeployqt.exe")
 
-    # This is the magic part: a post-install script that runs windeployqt
-    # and copies the necessary MinGW DLLs automatically.
-    install(CODE "
-        message(STATUS \"Running windeployqt on $<TARGET_FILE:${PROJECT_NAME}>\")
-        execute_process(COMMAND
-            \"${Qt6_WINDEPLOYQT_EXECUTABLE}\"
-            --dir \"\${CMAKE_INSTALL_PREFIX}\"
-            --sql
-            --release
-            \"$<TARGET_FILE:${PROJECT_NAME}>\"
-            RESULT_VARIABLE result
-        )
-        if(NOT result EQUAL 0)
-            message(FATAL_ERROR \"windeployqt failed with exit code \${result}\")
-        endif()
+add_custom_command(
+    TARGET MosleyOpen POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "--- Debugging Deployment Variables ---"
+    COMMAND ${CMAKE_COMMAND} -E echo "1. CMAKE_COMMAND = ${CMAKE_COMMAND}"
+    COMMAND ${CMAKE_COMMAND} -E echo "2. Qt6_WINDEPLOYQT_EXECUTABLE = ${WINDEPLOYQT_EXE}"
+    COMMAND ${CMAKE_COMMAND} -E echo "3. STAGING_DIR = ${STAGING_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E echo "4. Path to QMake = $<TARGET_FILE:Qt6::qmake>"
+    COMMAND ${CMAKE_COMMAND} -E echo "5. Path to Exe = $<TARGET_FILE:MosleyOpen>"
+    COMMENT "Printing debug variables for deployment..."
+)
 
-        message(STATUS \"Copying MinGW runtime DLLs...\")
-        set(MINGW_BIN_DIR \"C:/Qt/Tools/mingw1310_64/bin\")
-        file(COPY \${MINGW_BIN_DIR}/libgcc_s_seh-1.dll DESTINATION \${CMAKE_INSTALL_PREFIX}/bin)
-        file(COPY \${MINGW_BIN_DIR}/libstdc++-6.dll DESTINATION \${CMAKE_INSTALL_PREFIX}/bin)
-        file(COPY \${MINGW_BIN_DIR}/libwinpthread-1.dll DESTINATION \${CMAKE_INSTALL_PREFIX}/bin)
-    ")
 
-    # Include the CPack module to enable the 'package' target
-    include(CPack)
-endif()
+# This custom command runs after MosleyOpen.exe is built.
+# It prepares a full, runnable installation in the STAGING_DIR.
+add_custom_command(
+    TARGET MosleyOpen POST_BUILD
+    # Step 1: Create the staging bin directory
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${STAGING_DIR}/bin"
+    # Step 2: Copy our executable to the staging bin directory
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:MosleyOpen>" "${STAGING_DIR}/bin"
+    # Step 3: Run windeployqt on the executable now in the staging directory
+    COMMAND ${WINDEPLOYQT_EXE}
+        --dir "${STAGING_DIR}/bin"
+        --sql
+        --release
+        "${STAGING_DIR}/bin/MosleyOpen.exe"
+    # Step 4: Copy the MinGW runtime DLLs to the staging bin directory
+    COMMAND ${CMAKE_COMMAND} -E copy "C:/Qt/Tools/mingw1310_64/bin/libgcc_s_seh-1.dll" "${STAGING_DIR}/bin"
+    COMMAND ${CMAKE_COMMAND} -E copy "C:/Qt/Tools/mingw1310_64/bin/libstdc++-6.dll" "${STAGING_DIR}/bin"
+    COMMAND ${CMAKE_COMMAND} -E copy "C:/Qt/Tools/mingw1310_64/bin/libwinpthread-1.dll" "${STAGING_DIR}/bin"
+    # Step 5: Copy our database to the staging bin directory
+    COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/tournament.db" "${STAGING_DIR}/bin"
+    COMMENT "Staging application and dependencies for packaging..."
+)
+
+# The install command is now very simple: just install the contents of the staging directory.
+# This avoids all recursion and dependency-finding issues.
+install(
+    DIRECTORY "${STAGING_DIR}/"
+    DESTINATION "."
+)
+
+include(CPack)
