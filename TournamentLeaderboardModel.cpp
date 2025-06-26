@@ -331,9 +331,11 @@ void TournamentLeaderboardModel::calculateLeaderboard()
             if (!m_allScores.contains(playerId)) continue;
             if (!m_allScores[playerId].contains(dayNum)) continue;
 
+            int total_score = 0;
             for (auto const &[holeNum, scoreAndCourse] : m_allScores[playerId][dayNum].asKeyValueRange())
             {
                 int grossScore = scoreAndCourse.first;
+                total_score += grossScore;
                 int courseIdForScore = scoreAndCourse.second;
                 QPair<int, int> holeDetailsKey = qMakePair(courseIdForScore, holeNum);
                 if (m_holeParAndHandicapIndex.contains(holeDetailsKey))
@@ -346,6 +348,8 @@ void TournamentLeaderboardModel::calculateLeaderboard()
                         qDebug() << "Invalid score " << grossScore << "on par " << par << "for " << playerInfo.name;
                 }
             }
+
+            qDebug() << playerInfo.name << " shot " << total_score << " on day " << dayNum;
 
             row.dailyGrossStablefordPoints[dayNum] = dailyGrossPts;
             if (m_tournamentContext == MosleyOpen)

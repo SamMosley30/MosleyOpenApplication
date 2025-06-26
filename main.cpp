@@ -2,14 +2,47 @@
 #include <QMessageBox>
 #include <QtSql>
 #include <QDebug> // Add this for qDebug
+#include <QStandardPaths>
+#include <QDir>
+#include <QFile>
 #include "MainWindow.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
+
+    QCoreApplication::setOrganizationName("Sammos");
+    QCoreApplication::setApplicationName("MosleyOpen");
+
+    // 3. This new block finds/creates the writable database path
+    // Get the standard location for application data
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    qDebug() << "Writable path: " << dataPath; // DEBUG"
+    QDir dataDir(dataPath);
+
+    // Create the directory if it doesn't exist
+    if (!dataDir.exists()) {
+        dataDir.mkpath(".");
+    }
+
+    // Define the full path for the writable database
+    QString dbPath = dataPath + "/tournament.db";
+
+    // Check if the database already exists in the writable location.
+    // If not, copy it from the application's installation directory (the template).
+    if (!QFile::exists(dbPath)) {
+        QString templatePath = QCoreApplication::applicationDirPath() + "/tournament.db";
+        if (!QFile::copy(templatePath, dbPath)) {
+            QMessageBox::critical(nullptr, QObject::tr("Database Error"), QObject::tr("Could not create writable database."));
+            return 1;
+        }
+        // Set permissions to ensure the file is writable
+        QFile::setPermissions(dbPath, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther);
+    }
+
     QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
     QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath() + "/sqldrivers");
     QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE"); // This becomes the default connection
-    db.setDatabaseName("tournament.db");
+    db.setDatabaseName(dbPath);
 
     if (!db.open()) {
         QMessageBox::critical(nullptr, QObject::tr("Database Error"), db.lastError().text());
