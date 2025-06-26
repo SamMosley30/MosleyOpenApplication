@@ -31,6 +31,7 @@ int main(int argc, char *argv[]) {
     // If not, copy it from the application's installation directory (the template).
     if (!QFile::exists(dbPath)) {
         QString templatePath = QCoreApplication::applicationDirPath() + "/tournament.db";
+        qDebug() << "Template path: " << templatePath; // DEBUG
         if (!QFile::copy(templatePath, dbPath)) {
             QMessageBox::critical(nullptr, QObject::tr("Database Error"), QObject::tr("Could not create writable database."));
             return 1;
