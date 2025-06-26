@@ -27,17 +27,7 @@ int calculateStrokesReceived(int handicapForCalc, int holeHcIndex) {
 }
 
 TeamLeaderboardModel::TeamLeaderboardModel(const QString &connectionName, QObject *parent)
-    : QAbstractTableModel(parent), m_connectionName(connectionName) {
-    // Initialize leaderboard data for 6 teams
-    m_leaderboardData.resize(6);
-    for (int i = 0; i < 6; ++i) {
-        m_leaderboardData[i].teamId = i + 1;
-        // Initial name, will be overwritten by determineTeamNames()
-        m_leaderboardData[i].teamName = QString("Team %1 (Unassigned)").arg(i + 1); 
-        m_leaderboardData[i].overallTeamStablefordPoints = 0;
-        m_leaderboardData[i].rank = 0;
-    }
-}
+    : QAbstractTableModel(parent), m_connectionName(connectionName) {}
 
 TeamLeaderboardModel::~TeamLeaderboardModel() {}
 
@@ -47,7 +37,7 @@ QSqlDatabase TeamLeaderboardModel::database() const {
 
 int TeamLeaderboardModel::rowCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    return m_leaderboardData.size(); // Always 6 teams
+    return m_leaderboardData.size();
 }
 
 int TeamLeaderboardModel::columnCount(const QModelIndex &parent) const {
@@ -109,19 +99,10 @@ void TeamLeaderboardModel::refreshData() {
     m_allHoleDetails.clear();
     m_allScores.clear();
     m_daysWithScores.clear();
-
-    for (TeamLeaderboardRow &teamRow : m_leaderboardData) {
-        teamRow.dailyTeamStablefordPoints.clear();
-        teamRow.overallTeamStablefordPoints = 0;
-        teamRow.rank = 0;
-        teamRow.teamMembers.clear(); // Clear previous members
-        // Reset initial name, determineTeamNames will set it properly
-        teamRow.teamName = QString("Team %1 (No Captain)").arg(teamRow.teamId); 
-    }
+    m_leaderboardData.clear();
 
     fetchAllPlayersAndAssignments(); // This will populate m_allPlayers and m_playerTeamAssignments
                                      // And now also populate teamRow.teamMembers
-    determineTeamNames();            // Set team names based on captains
     fetchAllHoleDetails();
     fetchAllScores();
     calculateTeamLeaderboard();      // Calculates scores using team members
@@ -139,6 +120,22 @@ void TeamLeaderboardModel::fetchAllPlayersAndAssignments() {
         qDebug() << "TeamLeaderboardModel::fetchAllPlayersAndAssignments: ERROR: Invalid or closed database connection.";
         return;
     }
+
+    // First, fetch all team names and populate the leaderboard data
+    QSqlQuery teamNameQuery(db);
+    if (teamNameQuery.exec("SELECT id, name FROM teams ORDER BY id")) {
+        while (teamNameQuery.next()) {
+            TeamLeaderboardRow teamRow;
+            teamRow.teamId = teamNameQuery.value("id").toInt();
+            teamRow.teamName = teamNameQuery.value("name").toString();
+            teamRow.overallTeamStablefordPoints = 0;
+            teamRow.rank = 0;
+            m_leaderboardData.append(teamRow);
+        }
+    } else {
+        qDebug() << "TeamLeaderboardModel::fetchAllPlayersAndAssignments: ERROR fetching team names:" << teamNameQuery.lastError().text();
+    }
+
     QSqlQuery query(db);
     if (query.exec("SELECT id, name, handicap, team_id FROM players WHERE active = 1")) {
         while (query.next()) {
@@ -152,8 +149,12 @@ void TeamLeaderboardModel::fetchAllPlayersAndAssignments() {
             if (!teamIdVariant.isNull()) {
                 int teamId = teamIdVariant.toInt();
                 m_playerTeamAssignments[player.id] = teamId;
-                // Add player to the correct team's member list
-                if (teamId >= 1 && teamId <= m_leaderboardData.size()) {
+                // Find the team in m_leaderboardData and add the player
+                auto it = std::ranges::find_if(m_leaderboardData,
+                                       [teamId](const TeamLeaderboardRow& row) {
+                                           return row.teamId == teamId;
+                                       });
+                if (it != m_leaderboardData.end()) {
                     m_leaderboardData[teamId - 1].teamMembers.append(player);
                 }
             }
@@ -162,30 +163,6 @@ void TeamLeaderboardModel::fetchAllPlayersAndAssignments() {
         qDebug() << "TeamLeaderboardModel::fetchAllPlayersAndAssignments: ERROR executing query:" << query.lastError().text();
     }
 }
-
-void TeamLeaderboardModel::determineTeamNames() {
-    for (TeamLeaderboardRow &teamRow : m_leaderboardData) {
-        if (teamRow.teamMembers.isEmpty()) {
-            teamRow.teamName = QString("Team %1 (Empty)").arg(teamRow.teamId);
-            continue;
-        }
-
-        // Find player with highest handicap (point target) in this team
-        auto captainIt = std::ranges::max_element(teamRow.teamMembers,
-            [](const PlayerInfo& a, const PlayerInfo& b) {
-                return a.handicap < b.handicap; // Higher handicap is "greater"
-            });
-        
-        // Check if max_element returned a valid iterator (not end())
-        if (captainIt != teamRow.teamMembers.end()) {
-            teamRow.teamName = QString("Team %1").arg(captainIt->name);
-        } else {
-            // Should not happen if teamMembers is not empty, but as a fallback:
-            teamRow.teamName = QString("Team %1 (No Captain Found)").arg(teamRow.teamId);
-        }
-    }
-}
-
 
 void TeamLeaderboardModel::fetchAllHoleDetails() {
     QSqlDatabase db = database();
@@ -257,7 +234,7 @@ std::optional<int> TeamLeaderboardModel::getPlayerNetStablefordForHole(
         return std::nullopt;
 }
 
-int TeamLeaderboardModel::calculateTeamScoreForHole(TeamLeaderboardRow &team, int dayNum, int holeNum) const
+int TeamLeaderboardModel::calculateTeamScoreForHole(TeamLeaderboardRow &team, int dayNum, int holeNum, int numScoresToTake) const
 {
     // --- Ranges Pipeline to get scores for this hole ---
     auto scores_view = team.teamMembers
@@ -276,9 +253,9 @@ int TeamLeaderboardModel::calculateTeamScoreForHole(TeamLeaderboardRow &team, in
     std::ranges::copy(scores_view, std::back_inserter(scores_vec));
     std::ranges::sort(scores_vec, std::greater{});
 
-    // Sum the top 2 scores for the hole
+    // Sum the top N-1 scores for the hole (N being the size of the largest team)
     return std::ranges::fold_left(
-        scores_vec | std::views::take(2),
+        scores_vec | std::views::take(numScoresToTake),
         0,
         std::plus<>{});
 }
@@ -291,9 +268,16 @@ void TeamLeaderboardModel::calculateTeamLeaderboard()
         return;
     }
 
+    // Determine the size of the largest team
+    auto largestTeam = std::ranges::max(m_leaderboardData, [&](const TeamLeaderboardRow &a, const TeamLeaderboardRow &b)
+                     { return a.teamMembers.size() < b.teamMembers.size(); });
+
+    // N-1 scores, with a minimum of 1
+    int numScoresToTake = (largestTeam.teamMembers.size() > 1) ? largestTeam.teamMembers.size() - 1 : 1;
+
     // Iterate over each day (1, 2, 3)
     std::ranges::for_each(std::views::iota(1, 4), [&](int dayNum)
-                          {
+    {
         // Iterate over each team
         std::ranges::for_each(m_leaderboardData, [&](TeamLeaderboardRow &teamRow)
         {
@@ -301,9 +285,10 @@ void TeamLeaderboardModel::calculateTeamLeaderboard()
 
             // Iterate over each hole (1 to 18)
             std::ranges::for_each(std::views::iota(1, 19), [&](int holeNum)
-                                  { teamDailyTotalStablefordPoints += calculateTeamScoreForHole(teamRow, dayNum, holeNum); });
+                                  { teamDailyTotalStablefordPoints += calculateTeamScoreForHole(teamRow, dayNum, holeNum, numScoresToTake); });
             teamRow.dailyTeamStablefordPoints[dayNum] = teamDailyTotalStablefordPoints;
-        }); });
+        }); 
+    });
 
     // Calculate overall points by summing the daily points for each team
     std::ranges::for_each(m_leaderboardData, [](TeamLeaderboardRow &teamRow)

@@ -13,7 +13,7 @@
 
 // Structure to hold calculated data for each team on the leaderboard
 struct TeamLeaderboardRow {
-    int teamId;                 // 1, 2, 3, or 4
+    int teamId;
     QString teamName;           // e.g., "Team Jake"
     int rank;
     QMap<int, int> dailyTeamStablefordPoints; // Map<DayNum, TotalPointsForTeamOnThatDay>
@@ -55,9 +55,8 @@ private:
     void fetchAllPlayersAndAssignments(); // Will now also help populate teamMembers
     void fetchAllHoleDetails();
     void fetchAllScores();
-    void determineTeamNames(); // New method to set team names based on captain
     std::optional<int> getPlayerNetStablefordForHole(const PlayerInfo& member, int dayNum, int holeNum) const;
-    int calculateTeamScoreForHole(TeamLeaderboardRow & teamRow, int dayNum, int holeNum) const;
+    int calculateTeamScoreForHole(TeamLeaderboardRow & teamRow, int dayNum, int holeNum, int numScoresToTake) const;
     void calculateTeamLeaderboard();
 };
 

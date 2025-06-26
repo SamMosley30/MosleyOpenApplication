@@ -88,6 +88,15 @@ int main(int argc, char *argv[]) {
       )
     )");
 
+    // Teams table
+    q.exec(R"(
+      CREATE TABLE IF NOT EXISTS teams (
+        id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL UNIQUE
+      )
+    )");
+
+
     // Score Table
     q.exec(R"(
         CREATE TABLE IF NOT EXISTS scores (

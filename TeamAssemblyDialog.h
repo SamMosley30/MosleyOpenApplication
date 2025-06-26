@@ -7,10 +7,18 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLineEdit>
+#include <QScrollArea>
 #include <QGroupBox>
 #include <vector>
 #include "CommonStructs.h"
 #include "PlayerListWidget.h" // Include the custom PlayerListWidget
+
+struct TeamData {
+    int id;
+    QString name;
+    std::vector<PlayerInfo> members;
+};
 
 class TeamAssemblyDialog : public QDialog {
     Q_OBJECT
@@ -26,22 +34,29 @@ private slots:
     // This slot is called when a player is successfully dropped onto any PlayerListWidget
     void handlePlayerDropped(const PlayerInfo& player, PlayerListWidget* sourceList, PlayerListWidget* targetList);
 
+    void addTeam();
+    void removeTeam();
+
 private:
     QSqlDatabase &database;
 
     PlayerListWidget *activePlayersListWidget; 
+    QHBoxLayout *teamsLayout;
     std::vector<PlayerListWidget*> teamListWidgets; 
-    
+    std::vector<QLineEdit*> teamNameEditLines;
+
+    QPushButton *addTeamButton;
+    QPushButton *removeTeamButton;
     QPushButton *refreshPlayersButton;
     QPushButton *autoAssignButton; 
     QPushButton *saveButton;       
     QPushButton *closeButton;
 
-    // Internal data models for players
     std::vector<PlayerInfo> availablePlayersData; // Players not yet in a team
-    std::vector<std::vector<PlayerInfo>> teamsData; // Players organized by team index
+    std::vector<TeamData> teamsData; // Players organized by team index
 
     void setupUI();
+    void createTeamGroupBox(int teamIndex, const QString& teamName);
 };
 
 #endif // TEAMASSEMBLYDIALOG_H
