@@ -3,7 +3,7 @@
  * @brief Implements the DailyLeaderboardModel class.
  */
 
-#include "dailyleaderboardmodel.h"
+#include "DailyLeaderboardModel.h"
 #include "utils.h"
 #include <QSqlQuery>
 #include <QSqlError>

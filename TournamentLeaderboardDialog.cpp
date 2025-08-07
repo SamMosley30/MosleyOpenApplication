@@ -3,8 +3,8 @@
  * @brief Implements the TournamentLeaderboardDialog class.
  */
 
-#include "tournamentleaderboarddialog.h"
-#include "tournamentleaderboardmodel.h"
+#include "TournamentLeaderboardDialog.h"
+#include "TournamentLeaderboardModel.h"
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSqlError>

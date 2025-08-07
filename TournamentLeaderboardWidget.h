@@ -19,7 +19,7 @@
 #include <QMessageBox>
 #include <QDir>
 
-#include "tournamentleaderboardmodel.h"
+#include "TournamentLeaderboardModel.h"
 
 /**
  * @class TournamentLeaderboardWidget

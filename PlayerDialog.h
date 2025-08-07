@@ -8,6 +8,7 @@
 
 #include <QDialog>
 #include <QSqlTableModel>
+#include "Exporter.h"
 
 class QTableView;
 class QPushButton;
@@ -17,7 +18,7 @@ class QPushButton;
  * @brief A dialog for managing players in the database.
  *
  * This dialog displays a list of players from the database in a table view.
- * It allows adding new players, removing existing players, and exporting the player list to a CSV file.
+ * It allows adding new players, removing existing players, and exporting the player list.
  */
 class PlayerDialog : public QDialog {
     Q_OBJECT
@@ -25,9 +26,10 @@ public:
     /**
      * @brief Constructs a PlayerDialog object.
      * @param db The database connection to use.
+     * @param exporter The exporter to use for exporting data.
      * @param parent The parent widget.
      */
-    explicit PlayerDialog(QSqlDatabase &db, QWidget *parent = nullptr);
+    explicit PlayerDialog(QSqlDatabase &db, Exporter *exporter, QWidget *parent = nullptr);
 
 public slots:
     /**
@@ -41,9 +43,9 @@ public slots:
     void removeSelected();
 
     /**
-     * @brief Exports the player list to a CSV file.
+     * @brief Exports the player list using the provided exporter.
      */
-    void exportToCsv();
+    void exportData();
 
 private:
     QSqlTableModel *model;        ///< The model for the player data.
@@ -51,7 +53,8 @@ private:
     QPushButton *addButton;       ///< The button for adding a new player.
     QPushButton *removeButton;    ///< The button for removing selected players.
     QPushButton *closeButton;     ///< The button for closing the dialog.
-    QPushButton *exportButton;    ///< The button for exporting data to CSV.
+    QPushButton *exportButton;    ///< The button for exporting data.
+    Exporter *m_exporter;         ///< The exporter for exporting data.
 };
 
 #endif // PLAYERDIALOG_H

@@ -9,6 +9,7 @@
 #include "ScoreEntryDialog.h"
 #include "TournamentLeaderboardDialog.h"
 #include "TeamAssemblyDialog.h"
+#include "CsvExporter.h"
 #include <QtWidgets>
 #include <QSqlDatabase>
 #include <QDebug>
@@ -28,7 +29,7 @@ MainWindow::MainWindow(QSqlDatabase &db, QWidget *parent)
 {
     QString connNameToPass = database.connectionName();
 
-    playerDialog = new PlayerDialog(database, this);
+    playerDialog = new PlayerDialog(database, new CsvExporter(this), this);
     coursesDialog = new CoursesDialog(database, this);
     scoreDialog = new ScoreEntryDialog(connNameToPass, this);
     tournamentLeaderboardDialog = new TournamentLeaderboardDialog(connNameToPass, this);
