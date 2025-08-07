@@ -1,1 +1,22 @@
 /out
+
+# Build artifacts
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+MosleyOpen_autogen/
+MosleyOpen
+
+# User-specific files
+*.user
+
+# Qt Creator files
+*.pro.user
+*.pro.user.*
+
+# Log files
+*.log
+
+# Staging directory
+stage/

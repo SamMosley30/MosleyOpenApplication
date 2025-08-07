@@ -1,0 +1,11 @@
+/app/CMakeFiles/MosleyOpen.dir
+/app/CMakeFiles/package.dir
+/app/CMakeFiles/package_source.dir
+/app/CMakeFiles/edit_cache.dir
+/app/CMakeFiles/rebuild_cache.dir
+/app/CMakeFiles/list_install_components.dir
+/app/CMakeFiles/install.dir
+/app/CMakeFiles/install/local.dir
+/app/CMakeFiles/install/strip.dir
+/app/CMakeFiles/MosleyOpen_autogen_timestamp_deps.dir
+/app/CMakeFiles/MosleyOpen_autogen.dir

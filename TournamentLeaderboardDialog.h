@@ -15,8 +15,8 @@
 #include <QLabel>
 #include <QSpinBox>
 
-#include "tournamentleaderboardwidget.h"
-#include "dailyleaderboardwidget.h"
+#include "TournamentLeaderboardWidget.h"
+#include "DailyLeaderboardWidget.h"
 #include "TeamLeaderboardWidget.h"
 
 /**

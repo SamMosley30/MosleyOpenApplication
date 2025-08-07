@@ -18,7 +18,7 @@
 #include <QMessageBox>
 #include <QDir>
 
-#include "dailyleaderboardmodel.h"
+#include "DailyLeaderboardModel.h"
 
 /**
  * @class DailyLeaderboardWidget

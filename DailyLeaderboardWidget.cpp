@@ -3,7 +3,7 @@
  * @brief Implements the DailyLeaderboardWidget class.
  */
 
-#include "dailyleaderboardwidget.h"
+#include "DailyLeaderboardWidget.h"
 #include <QSqlDatabase>
 #include <QDebug>
 #include <QFontMetrics>
