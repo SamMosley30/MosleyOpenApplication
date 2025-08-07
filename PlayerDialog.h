@@ -29,6 +29,11 @@ public:
      */
     explicit PlayerDialog(QSqlDatabase &db, QWidget *parent = nullptr);
 
+    /**
+     * @brief Refreshes the player data from the database.
+     */
+    void refresh();
+
 public slots:
     /**
      * @brief Adds a new player to the database.

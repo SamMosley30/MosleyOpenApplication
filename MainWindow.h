@@ -58,6 +58,16 @@ private slots:
      */
     void openTeamAssemblyDialog();
 
+    /**
+     * @brief Archives the current database to a new file.
+     */
+    void archiveDatabase();
+
+    /**
+     * @brief Loads a database from an archive file.
+     */
+    void loadDatabaseFromArchive();
+
 private:
     PlayerDialog *playerDialog;                     ///< The player management dialog.
     CoursesDialog *coursesDialog;                   ///< The course management dialog.

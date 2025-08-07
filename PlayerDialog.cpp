@@ -65,6 +65,13 @@ PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
 }
 
 /**
+ * @brief Refreshes the player data from the database.
+ */
+void PlayerDialog::refresh() {
+    model->select();
+}
+
+/**
  * @brief Adds a new player to the database.
  *
  * This slot is called when the "Add" button is clicked. It inserts a new row

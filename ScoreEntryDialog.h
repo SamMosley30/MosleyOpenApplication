@@ -42,6 +42,11 @@ public:
      */
     ~ScoreEntryDialog();
 
+    /**
+     * @brief Refreshes the data in the dialog.
+     */
+    void refresh();
+
 private slots:
     void onDay1CourseSelected(int index);
     void onDay2CourseSelected(int index);

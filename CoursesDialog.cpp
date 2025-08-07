@@ -108,6 +108,30 @@ CoursesDialog::CoursesDialog(QSqlDatabase &db, QWidget *parent)
 }
 
 /**
+ * @brief Refreshes the course data from the database.
+ */
+void CoursesDialog::refresh() {
+    QModelIndexList selectedRows = courseView->selectionModel()->selectedRows();
+    int selectedRow = -1;
+    if (!selectedRows.isEmpty()) {
+        selectedRow = selectedRows.first().row();
+    }
+
+    courseModel->select();
+
+    if (selectedRow != -1 && selectedRow < courseModel->rowCount()) {
+        courseView->selectRow(selectedRow);
+        onCourseSelectionChanged(courseModel->index(selectedRow, 0));
+    } else if (courseModel->rowCount() > 0) {
+        courseView->selectRow(0);
+        onCourseSelectionChanged(courseModel->index(0, 0));
+    } else {
+        // No courses, clear the holes view
+        holesTransposedModel->setCourseId(-1);
+    }
+}
+
+/**
  * @brief Handles the selection change in the course view.
  *
  * When a course is selected, this slot updates the holes view to display

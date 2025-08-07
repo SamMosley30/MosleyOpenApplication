@@ -113,6 +113,12 @@ ScoreEntryDialog::~ScoreEntryDialog()
 {
 }
 
+void ScoreEntryDialog::refresh()
+{
+    populateCourseComboBoxes();
+    loadSavedCourseSelections();
+}
+
 QSqlDatabase ScoreEntryDialog::database() const
 {
     return QSqlDatabase::database(m_connectionName);
