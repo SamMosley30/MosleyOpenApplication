@@ -47,6 +47,11 @@ public:
      */
     explicit TeamAssemblyDialog(QSqlDatabase &db, QWidget *parent = nullptr);
 
+    /**
+     * @brief Refreshes the data in the dialog.
+     */
+    void refresh();
+
 private slots:
     void loadActivePlayers();
     void autoAssignTeams();

@@ -26,6 +26,14 @@ TeamAssemblyDialog::TeamAssemblyDialog(QSqlDatabase &db, QWidget *parent)
 }
 
 /**
+ * @brief Refreshes the data in the dialog.
+ */
+void TeamAssemblyDialog::refresh()
+{
+    loadActivePlayers();
+}
+
+/**
  * @brief Creates a group box for a team.
  * @param teamIndex The index of the team.
  * @param teamName The name of the team.

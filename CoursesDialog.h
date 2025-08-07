@@ -35,6 +35,11 @@ public:
      */
     explicit CoursesDialog(QSqlDatabase &db, QWidget *parent = nullptr);
 
+    /**
+     * @brief Refreshes the course data from the database.
+     */
+    void refresh();
+
 private slots:
     /**
      * @brief Adds a new course to the database.
