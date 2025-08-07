@@ -1,47 +1,70 @@
+/**
+ * @file TournamentLeaderboardDialog.h
+ * @brief Contains the declaration of the TournamentLeaderboardDialog class.
+ */
+
 #ifndef TOURNAMENTLEADERBOARDDIALOG_H
 #define TOURNAMENTLEADERBOARDDIALOG_H
 
 #include <QDialog>
-#include <QSqlDatabase> 
+#include <QSqlDatabase>
 #include <QPushButton>
-#include <QVBoxLayout> 
-#include <QHBoxLayout> 
-#include <QTabWidget>  
-#include <QLabel>      // For labels
-#include <QSpinBox>    // For cut line input
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QTabWidget>
+#include <QLabel>
+#include <QSpinBox>
 
-// Include the custom widget headers
-#include "tournamentleaderboardwidget.h" // This will be used for Combined, Mosley, and Twisted views
+#include "tournamentleaderboardwidget.h"
 #include "dailyleaderboardwidget.h"
-#include "TeamLeaderboardWidget.h" 
+#include "TeamLeaderboardWidget.h"
 
-
+/**
+ * @class TournamentLeaderboardDialog
+ * @brief A dialog for displaying various tournament leaderboards.
+ *
+ * This dialog provides a tabbed interface for viewing different leaderboards,
+ * including combined overall, Mosley Open, Twisted Creek, daily leaderboards,
+ * and the team leaderboard. It also includes functionality for applying a cut line.
+ */
 class TournamentLeaderboardDialog : public QDialog
 {
-    Q_OBJECT 
+    Q_OBJECT
 
 public:
+    /**
+     * @brief Constructs a TournamentLeaderboardDialog object.
+     * @param connectionName The name of the database connection to use.
+     * @param parent The parent widget.
+     */
     explicit TournamentLeaderboardDialog(const QString &connectionName, QWidget *parent = nullptr);
+
+    /**
+     * @brief Destroys the TournamentLeaderboardDialog object.
+     */
     ~TournamentLeaderboardDialog();
 
 public slots:
+    /**
+     * @brief Refreshes all leaderboards.
+     */
     void refreshLeaderboards();
 
 private slots:
     void exportCurrentImage();
     void applyCutClicked();
     void clearCutClicked();
-    void cutLineScoreChanged(int value); // Optional: for immediate save on spinbox change
+    void cutLineScoreChanged(int value);
 
 private:
-    QString m_connectionName; 
+    QString m_connectionName;
 
-    QTabWidget *tabWidget; 
+    QTabWidget *tabWidget;
 
     // Leaderboard Widgets
-    TournamentLeaderboardWidget *combinedOverallWidget; // For pre-cut or combined view
-    TournamentLeaderboardWidget *mosleyOpenWidget;    // For Mosley Open (post-cut)
-    TournamentLeaderboardWidget *twistedCreekWidget;  // For Twisted Creek (post-cut)
+    TournamentLeaderboardWidget *combinedOverallWidget;
+    TournamentLeaderboardWidget *mosleyOpenWidget;
+    TournamentLeaderboardWidget *twistedCreekWidget;
     
     DailyLeaderboardWidget *day1LeaderboardWidget;            
     DailyLeaderboardWidget *day2LeaderboardWidget;            
@@ -63,7 +86,7 @@ private:
     bool m_isCutApplied;
 
     QSqlDatabase database() const;
-    void setupCutLineUI(QVBoxLayout* mainLayout); // Helper to add cut line UI
+    void setupCutLineUI(QVBoxLayout* mainLayout);
     void loadCutSettings();
     void saveCutSettings();
 };

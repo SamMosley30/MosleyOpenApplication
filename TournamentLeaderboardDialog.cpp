@@ -1,3 +1,8 @@
+/**
+ * @file TournamentLeaderboardDialog.cpp
+ * @brief Implements the TournamentLeaderboardDialog class.
+ */
+
 #include "tournamentleaderboarddialog.h"
 #include "tournamentleaderboardmodel.h"
 #include <QSqlDatabase>
@@ -26,8 +31,7 @@ TournamentLeaderboardDialog::TournamentLeaderboardDialog(const QString &connecti
       mosleyOpenWidget(new TournamentLeaderboardWidget(m_connectionName, this)), twistedCreekWidget(new TournamentLeaderboardWidget(m_connectionName, this)), day1LeaderboardWidget(new DailyLeaderboardWidget(m_connectionName, 1, this)), day2LeaderboardWidget(new DailyLeaderboardWidget(m_connectionName, 2, this)), day3LeaderboardWidget(new DailyLeaderboardWidget(m_connectionName, 3, this)), teamLeaderboardWidget(new TeamLeaderboardWidget(m_connectionName, this)), cutLineLabel(new QLabel(tr("Cut Line Score (2-Day Mosley Net Stableford):"), this)), cutLineSpinBox(new QSpinBox(this)), applyCutButton(new QPushButton(tr("Apply Cut"), this)), clearCutButton(new QPushButton(tr("Clear Cut"), this)), refreshButton(new QPushButton(tr("Refresh All"), this)), closeButton(new QPushButton(tr("Close"), this)), exportImageButton(new QPushButton(tr("Export Current Tab"), this)), m_cutLineScore(DEFAULT_CUT_LINE_SCORE), m_isCutApplied(false)
 {
     QSqlDatabase db = database();
-    if (!db.isValid() || !db.isOpen())
-    {
+    if (!db.isValid() || !db.isOpen()) {
         qDebug() << "TournamentLeaderboardDialog: ERROR: Invalid or closed database connection.";
         refreshButton->setEnabled(false);
         exportImageButton->setEnabled(false);
@@ -43,7 +47,6 @@ TournamentLeaderboardDialog::TournamentLeaderboardDialog(const QString &connecti
     applyCutButton->setEnabled(!m_isCutApplied);
     clearCutButton->setEnabled(m_isCutApplied);
 
-    // --- Setup Tab Widget ---
     tabWidget->addTab(mosleyOpenWidget, tr("Mosley Open"));
     tabWidget->addTab(twistedCreekWidget, tr("Twisted Creek"));
     tabWidget->addTab(day1LeaderboardWidget, tr("Day 1 Scores"));
@@ -77,6 +80,10 @@ TournamentLeaderboardDialog::TournamentLeaderboardDialog(const QString &connecti
 
 TournamentLeaderboardDialog::~TournamentLeaderboardDialog() {}
 
+/**
+ * @brief Sets up the UI for the cut line controls.
+ * @param mainLayout The main layout of the dialog.
+ */
 void TournamentLeaderboardDialog::setupCutLineUI(QVBoxLayout *mainLayout)
 {
     QHBoxLayout *cutLineLayout = new QHBoxLayout();
@@ -93,11 +100,13 @@ QSqlDatabase TournamentLeaderboardDialog::database() const
     return QSqlDatabase::database(m_connectionName);
 }
 
+/**
+ * @brief Loads the cut line settings from the database.
+ */
 void TournamentLeaderboardDialog::loadCutSettings()
 {
     QSqlDatabase db = database();
-    if (!db.isValid() || !db.isOpen())
-    {
+    if (!db.isValid() || !db.isOpen()) {
         qDebug() << "TournamentLeaderboardDialog::loadCutSettings: Database not open.";
         m_cutLineScore = DEFAULT_CUT_LINE_SCORE;
         m_isCutApplied = false;
@@ -107,22 +116,25 @@ void TournamentLeaderboardDialog::loadCutSettings()
     query.prepare("SELECT value FROM settings WHERE key = :key");
 
     query.bindValue(":key", SETTING_CUT_LINE_SCORE);
-    if (query.exec() && query.next())
-    {
+    if (query.exec() && query.next()) {
         bool ok;
         int score = query.value(0).toInt(&ok);
         m_cutLineScore = ok ? score : DEFAULT_CUT_LINE_SCORE;
-    }
-    else
+    } else {
         m_cutLineScore = DEFAULT_CUT_LINE_SCORE;
+    }
 
     query.bindValue(":key", SETTING_IS_CUT_APPLIED);
-    if (query.exec() && query.next())
+    if (query.exec() && query.next()) {
         m_isCutApplied = query.value(0).toBool();
-    else
+    } else {
         m_isCutApplied = false;
+    }
 }
 
+/**
+ * @brief Saves the cut line settings to the database.
+ */
 void TournamentLeaderboardDialog::saveCutSettings()
 {
     QSqlDatabase db = database();
@@ -133,15 +145,20 @@ void TournamentLeaderboardDialog::saveCutSettings()
 
     query.bindValue(":key", SETTING_CUT_LINE_SCORE);
     query.bindValue(":value", m_cutLineScore);
-    if (!query.exec())
+    if (!query.exec()) {
         qWarning() << "TournamentLeaderboardDialog::saveCutSettings: Failed to save cut_line_score:" << query.lastError().text();
+    }
 
     query.bindValue(":key", SETTING_IS_CUT_APPLIED);
     query.bindValue(":value", m_isCutApplied);
-    if (!query.exec())
+    if (!query.exec()) {
         qWarning() << "TournamentLeaderboardDialog::saveCutSettings: Failed to save is_cut_applied:" << query.lastError().text();
+    }
 }
 
+/**
+ * @brief Slot for when the "Apply Cut" button is clicked.
+ */
 void TournamentLeaderboardDialog::applyCutClicked()
 {
     m_isCutApplied = true;
@@ -153,6 +170,9 @@ void TournamentLeaderboardDialog::applyCutClicked()
     QMessageBox::information(this, tr("Cut Applied"), tr("The cut has been applied with score: %1. Leaderboards refreshed.").arg(m_cutLineScore));
 }
 
+/**
+ * @brief Slot for when the "Clear Cut" button is clicked.
+ */
 void TournamentLeaderboardDialog::clearCutClicked()
 {
     m_isCutApplied = false;
@@ -163,33 +183,33 @@ void TournamentLeaderboardDialog::clearCutClicked()
     QMessageBox::information(this, tr("Cut Cleared"), tr("The cut has been cleared. Leaderboards refreshed."));
 }
 
+/**
+ * @brief Slot for when the cut line score is changed.
+ * @param value The new cut line score.
+ */
 void TournamentLeaderboardDialog::cutLineScoreChanged(int value)
 {
 }
 
 void TournamentLeaderboardDialog::refreshLeaderboards()
 {
-    // Configure and refresh Mosley Open Widget
-    if (TournamentLeaderboardModel *model = qobject_cast<TournamentLeaderboardModel *>(mosleyOpenWidget->leaderboardModel))
-    {
+    if (TournamentLeaderboardModel *model = qobject_cast<TournamentLeaderboardModel *>(mosleyOpenWidget->leaderboardModel)) {
         model->setTournamentContext(TournamentLeaderboardModel::MosleyOpen);
         model->setCutLineScore(m_cutLineScore);
         model->setIsCutApplied(m_isCutApplied);
-        mosleyOpenWidget->refreshData(); // Refresh data for this specific widget
-    }
-    else
+        mosleyOpenWidget->refreshData();
+    } else {
         qWarning() << "Failed to cast model for Mosley Open Widget.";
-
-    // Configure and refresh Twisted Creek Widget
-    if (TournamentLeaderboardModel *model = qobject_cast<TournamentLeaderboardModel *>(twistedCreekWidget->leaderboardModel))
-    {
-        model->setTournamentContext(TournamentLeaderboardModel::TwistedCreek);
-        model->setCutLineScore(m_cutLineScore); // It needs the cut score to know who *not* to include if cut is applied
-        model->setIsCutApplied(m_isCutApplied);
-        twistedCreekWidget->refreshData(); // Refresh data for this specific widget
     }
-    else
+
+    if (TournamentLeaderboardModel *model = qobject_cast<TournamentLeaderboardModel *>(twistedCreekWidget->leaderboardModel)) {
+        model->setTournamentContext(TournamentLeaderboardModel::TwistedCreek);
+        model->setCutLineScore(m_cutLineScore);
+        model->setIsCutApplied(m_isCutApplied);
+        twistedCreekWidget->refreshData();
+    } else {
         qWarning() << "Failed to cast model for Twisted Creek Widget.";
+    }
 
     day1LeaderboardWidget->refreshData();
     day2LeaderboardWidget->refreshData();
@@ -197,35 +217,38 @@ void TournamentLeaderboardDialog::refreshLeaderboards()
     teamLeaderboardWidget->refreshData();
 }
 
+/**
+ * @brief Exports the currently visible leaderboard as an image.
+ */
 void TournamentLeaderboardDialog::exportCurrentImage()
 {
     QWidget *currentWidget = tabWidget->currentWidget();
     QImage exportedImage;
 
-    if (TournamentLeaderboardWidget *overallWidget = qobject_cast<TournamentLeaderboardWidget *>(currentWidget))
+    if (TournamentLeaderboardWidget *overallWidget = qobject_cast<TournamentLeaderboardWidget *>(currentWidget)) {
         exportedImage = overallWidget->exportToImage();
-    else if (DailyLeaderboardWidget *dailyWidget = qobject_cast<DailyLeaderboardWidget *>(currentWidget))
+    } else if (DailyLeaderboardWidget *dailyWidget = qobject_cast<DailyLeaderboardWidget *>(currentWidget)) {
         exportedImage = dailyWidget->exportToImage();
-    else if (TeamLeaderboardWidget *teamWidget = qobject_cast<TeamLeaderboardWidget *>(currentWidget))
+    } else if (TeamLeaderboardWidget *teamWidget = qobject_cast<TeamLeaderboardWidget *>(currentWidget)) {
         exportedImage = teamWidget->exportToImage();
-    else
-    {
+    } else {
         QMessageBox::warning(this, tr("Export Failed"), tr("Cannot export the current tab type."));
         return;
     }
 
-    if (exportedImage.isNull())
-    {
+    if (exportedImage.isNull()) {
         qDebug() << "TournamentLeaderboardDialog::exportCurrentImage: ExportToImage returned null for widget:" << (currentWidget ? currentWidget->objectName() : "null");
         return;
     }
 
     QString filePath = QFileDialog::getSaveFileName(this, tr("Save Leaderboard Image"), QDir::homePath(), tr("PNG Files (*.png);;JPEG Files (*.jpg *.jpeg);;BMP Files (*.bmp)"));
-    if (filePath.isEmpty())
+    if (filePath.isEmpty()) {
         return;
+    }
 
-    if (exportedImage.save(filePath))
+    if (exportedImage.save(filePath)) {
         QMessageBox::information(this, tr("Export Successful"), tr("Leaderboard image saved to:\n%1").arg(QDir::toNativeSeparators(filePath)));
-    else
+    } else {
         QMessageBox::critical(this, tr("Export Failed"), tr("Could not save image to:\n%1").arg(QDir::toNativeSeparators(filePath)));
+    }
 }

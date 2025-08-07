@@ -1,3 +1,8 @@
+/**
+ * @file TournamentLeaderboardModel.h
+ * @brief Contains the declaration of the TournamentLeaderboardModel class.
+ */
+
 #ifndef TOURNAMENTLEADERBOARDMODEL_H
 #define TOURNAMENTLEADERBOARDMODEL_H
 
@@ -8,35 +13,45 @@
 #include <QString>
 #include <QMap>
 #include <QPair>
-#include <QDebug> 
-#include <QSet>      
+#include <QDebug>
+#include <QSet>
 
 #include "CommonStructs.h"
 
+/**
+ * @struct LeaderboardRow
+ * @brief Holds calculated data for a single player on the leaderboard.
+ */
 struct LeaderboardRow {
     int playerId;
     QString playerName;
-    int playerActualDbHandicap; // Player's actual handicap from the database
-    int totalNetStablefordPoints; // Overall net Stableford points for THIS specific leaderboard context
-    int rank;                  
-
-    QMap<int, int> dailyGrossStablefordPoints; // Gross points for the day
-    QMap<int, int> dailyNetStablefordPoints;   // Net points for the day (calculated based on context)
-    
-    // This is the 2-day total calculated using ONLY MOSLEY OPEN handicap rules, used for cut decision.
-    // It might not be directly displayed in every leaderboard row but is essential for filtering.
-    int twoDayMosleyNetScoreForCut; 
+    int playerActualDbHandicap;
+    int totalNetStablefordPoints;
+    int rank;
+    QMap<int, int> dailyGrossStablefordPoints;
+    QMap<int, int> dailyNetStablefordPoints;
+    int twoDayMosleyNetScoreForCut;
 };
 
+/**
+ * @class TournamentLeaderboardModel
+ * @brief A model for calculating and displaying tournament leaderboards.
+ *
+ * This model can calculate leaderboards for different tournament contexts,
+ * such as the Mosley Open or Twisted Creek, and can apply a cut line.
+ */
 class TournamentLeaderboardModel : public QAbstractTableModel
 {
-    Q_OBJECT 
+    Q_OBJECT
 
 public:
+    /**
+     * @enum TournamentContext
+     * @brief Defines the context for leaderboard calculations.
+     */
     enum TournamentContext {
-        MosleyOpen,  // Calculates scores with Mosley handicap rules
-        TwistedCreek // Calculates scores with actual handicaps
-        // Removed 'Combined' as per new requirements
+        MosleyOpen,
+        TwistedCreek
     };
 
     explicit TournamentLeaderboardModel(const QString &connectionName, QObject *parent = nullptr);
@@ -51,37 +66,34 @@ public:
     QSet<int> getDaysWithScores() const;
 
     void setTournamentContext(TournamentContext context);
-    TournamentContext getTournamentContext() const { return m_tournamentContext; };
+    TournamentContext getTournamentContext() const { return m_tournamentContext; }
     void setCutLineScore(int score);
     void setIsCutApplied(bool applied);
-    
-    int getColumnForDailyGrossPoints(int dayNum) const; 
-    int getColumnForDailyNetPoints(int dayNum) const;   
+
+    int getColumnForDailyGrossPoints(int dayNum) const;
+    int getColumnForDailyNetPoints(int dayNum) const;
 
 private:
-    QString m_connectionName; 
-    QVector<LeaderboardRow> m_leaderboardData; 
-    QSet<int> m_daysWithScores; 
+    QString m_connectionName;
+    QVector<LeaderboardRow> m_leaderboardData;
+    QSet<int> m_daysWithScores;
 
-    TournamentContext m_tournamentContext; // Is this model for Mosley or Twisted Creek?
+    TournamentContext m_tournamentContext;
     int m_cutLineScore;
     bool m_isCutApplied;
 
-    QMap<int, PlayerInfo> m_allPlayers; 
-    QMap<QPair<int, int>, QPair<int, int>> m_holeParAndHandicapIndex; // Key: <CourseId, HoleNum>, Value: <Par, HoleIndex>
-    QMap<int, QMap<int, QMap<int, QPair<int, int>>>> m_allScores; // PlayerId -> DayNum -> HoleNum -> <Score, CourseId>
-    
-    // Stores the 2-day net Stableford score for each player, calculated *using Mosley Open handicap rules*.
-    // This is used for the cut decision.
-    QMap<int, int> m_playerTwoDayMosleyNetScoreForCut; 
+    QMap<int, PlayerInfo> m_allPlayers;
+    QMap<QPair<int, int>, QPair<int, int>> m_holeParAndHandicapIndex;
+    QMap<int, QMap<int, QMap<int, QPair<int, int>>>> m_allScores;
+    QMap<int, int> m_playerTwoDayMosleyNetScoreForCut;
 
-    QSqlDatabase database() const; 
+    QSqlDatabase database() const;
 
     void fetchAllPlayers();
-    void fetchAllHoleDetails(); 
+    void fetchAllHoleDetails();
     void fetchAllScores();
-    void calculateAllPlayerTwoDayMosleyNetScores(); // Calculates m_playerTwoDayMosleyNetScoreForCut
-    void calculateLeaderboard(); 
+    void calculateAllPlayerTwoDayMosleyNetScores();
+    void calculateLeaderboard();
 
     int calculateNetStablefordPointsForHole(int grossScore, int par) const;
 };

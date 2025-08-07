@@ -1,9 +1,23 @@
+/**
+ * @file PlayerDialog.cpp
+ * @brief Implements the PlayerDialog class.
+ */
+
 #include "PlayerDialog.h"
 #include "SpinBoxDelegate.h"    // For SpinBoxDelegate
 #include "CheckBoxDelegate.h" // For CheckBoxDelegate
 #include <QtWidgets>            // For QTableView, QPushButton, Layouts etc.
 #include <QtSql>                // For QSqlTableModel, QSqlQuery, QSqlError
 
+/**
+ * @brief Constructs a PlayerDialog object.
+ *
+ * This constructor sets up the UI for the player dialog, including the table view,
+ * buttons, and layout. It also initializes the model and connects signals and slots.
+ *
+ * @param db The database connection to use.
+ * @param parent The parent widget.
+ */
 PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
     : QDialog(parent)
     // No need to store 'db' as a member if only used for model initialization here
@@ -50,6 +64,12 @@ PlayerDialog::PlayerDialog(QSqlDatabase &db, QWidget *parent)
     connect(exportButton, &QPushButton::clicked, this, &PlayerDialog::exportToCsv);
 }
 
+/**
+ * @brief Adds a new player to the database.
+ *
+ * This slot is called when the "Add" button is clicked. It inserts a new row
+ * into the model and sets default values for the new player.
+ */
 void PlayerDialog::addPlayer() {
     int row = model->rowCount();
     model->insertRow(row);
@@ -64,6 +84,12 @@ void PlayerDialog::addPlayer() {
         qWarning() << "PlayerDialog::addPlayer - submitAll() failed:" << model->lastError().text();
 }
 
+/**
+ * @brief Removes the selected player(s) from the database.
+ *
+ * This slot is called when the "Remove" button is clicked. It removes the
+ * selected rows from the table view and the database.
+ */
 void PlayerDialog::removeSelected() {
     QModelIndexList selected = tableView->selectionModel()->selectedRows();
     if (selected.isEmpty()) {
@@ -88,6 +114,13 @@ void PlayerDialog::removeSelected() {
     }
 }
 
+/**
+ * @brief Exports the player list to a CSV file.
+ *
+ * This slot is called when the "Export to CSV" button is clicked. It opens a
+ * file dialog to choose a location to save the CSV file, and then writes the
+ * player data to the selected file.
+ */
 void PlayerDialog::exportToCsv() {
     QString filePath = QFileDialog::getSaveFileName(this,
                                                     tr("Export Player Data"), 

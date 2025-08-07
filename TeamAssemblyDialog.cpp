@@ -1,16 +1,21 @@
+/**
+ * @file TeamAssemblyDialog.cpp
+ * @brief Implements the TeamAssemblyDialog class.
+ */
+
 #include "TeamAssemblyDialog.h"
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QDebug>
 #include <QMessageBox>
-#include <algorithm> // For std::remove_if, std::sort, std::shuffle, std::any_of, std::none_of
-#include <random>    // For std::mt19937, std::random_device
+#include <algorithm>
+#include <random>
 
 TeamAssemblyDialog::TeamAssemblyDialog(QSqlDatabase &db, QWidget *parent)
-    : QDialog(parent), database(db) 
+    : QDialog(parent), database(db)
 {
     setupUI();
-    loadActivePlayers(); // Load initial players and their persisted team assignments
+    loadActivePlayers();
 
     connect(addTeamButton, &QPushButton::clicked, this, &TeamAssemblyDialog::addTeam);
     connect(removeTeamButton, &QPushButton::clicked, this, &TeamAssemblyDialog::removeTeam);
@@ -20,13 +25,16 @@ TeamAssemblyDialog::TeamAssemblyDialog(QSqlDatabase &db, QWidget *parent)
     connect(saveButton, &QPushButton::clicked, this, &TeamAssemblyDialog::saveTeams);
 }
 
-// Default destructor is sufficient as child widgets are handled by Qt
-
+/**
+ * @brief Creates a group box for a team.
+ * @param teamIndex The index of the team.
+ * @param teamName The name of the team.
+ */
 void TeamAssemblyDialog::createTeamGroupBox(int teamIndex, const QString& teamName)
 {
     QGroupBox *teamXGroupBox = new QGroupBox(this);
     teamXGroupBox->setObjectName(QString("teamGroupBox%1").arg(teamIndex));
-    teamXGroupBox->setTitle(QString("Team %1").arg(teamIndex + 1)); // Set title for identification
+    teamXGroupBox->setTitle(QString("Team %1").arg(teamIndex + 1));
 
     QVBoxLayout *teamXLayout = new QVBoxLayout(teamXGroupBox);
 
@@ -40,15 +48,16 @@ void TeamAssemblyDialog::createTeamGroupBox(int teamIndex, const QString& teamNa
     teamListWidgets.push_back(teamXListWidget);
     teamXLayout->addWidget(teamXListWidget, 1);
 
-    // Find the teamsLayout which is inside the scroll area
     qobject_cast<QHBoxLayout*>(teamXGroupBox->parentWidget()->layout())->addWidget(teamXGroupBox);
 
     connect(teamXListWidget, QOverload<const PlayerInfo&, PlayerListWidget*, PlayerListWidget*>::of(&PlayerListWidget::playerDropped),
         this, &TeamAssemblyDialog::handlePlayerDropped);
 }
 
+/**
+ * @brief Adds a new team.
+ */
 void TeamAssemblyDialog::addTeam() {
-    // Find the highest existing team ID to determine the new ID
     QSqlQuery maxIdQuery("SELECT MAX(id) FROM teams", database);
     int maxId = 0;
     if (maxIdQuery.exec() && maxIdQuery.next()) {
@@ -56,7 +65,6 @@ void TeamAssemblyDialog::addTeam() {
     }
     int newTeamId = maxId + 1;
 
-    // Insert the new team into the database
     QSqlQuery insertQuery(database);
     insertQuery.prepare("INSERT INTO teams (id, name) VALUES (:id, :name)");
     insertQuery.bindValue(":id", newTeamId);
@@ -66,12 +74,13 @@ void TeamAssemblyDialog::addTeam() {
         return;
     }
     
-    // Reload everything from the database to reflect the change
     loadActivePlayers();
 }
 
+/**
+ * @brief Removes the last team.
+ */
 void TeamAssemblyDialog::removeTeam() {
-    // Find the highest team ID to remove
     QSqlQuery maxIdQuery("SELECT MAX(id) FROM teams", database);
     int maxId = 0;
     if (maxIdQuery.exec() && maxIdQuery.next()) {
@@ -83,8 +92,6 @@ void TeamAssemblyDialog::removeTeam() {
         return;
     }
     
-    // For simplicity, we only allow removing the last team.
-    // A more complex implementation could allow choosing which team to remove.
     QString teamNameToRemove = "team";
     QSqlQuery nameQuery(database);
     nameQuery.prepare("SELECT name FROM teams WHERE id = :id");
@@ -117,13 +124,15 @@ void TeamAssemblyDialog::removeTeam() {
     loadActivePlayers();
 }
 
+/**
+ * @brief Sets up the UI for the dialog.
+ */
 void TeamAssemblyDialog::setupUI() {
     setWindowTitle(tr("Assemble Teams (Drag & Drop)"));
     setMinimumSize(800, 600); 
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
 
-    // Active Players Section
     QGroupBox *activePlayersGroupBox = new QGroupBox(tr("Available Players"));
     QVBoxLayout *activePlayersLayout = new QVBoxLayout(activePlayersGroupBox);
     activePlayersListWidget = new PlayerListWidget(this);
@@ -135,7 +144,6 @@ void TeamAssemblyDialog::setupUI() {
     connect(activePlayersListWidget, QOverload<const PlayerInfo&, PlayerListWidget*, PlayerListWidget*>::of(&PlayerListWidget::playerDropped),
         this, &TeamAssemblyDialog::handlePlayerDropped);
 
-    // Teams Section
     QScrollArea *teamsScrollArea = new QScrollArea(this);
     teamsScrollArea->setWidgetResizable(true);
     QWidget *teamsScrollWidget = new QWidget;
@@ -144,7 +152,6 @@ void TeamAssemblyDialog::setupUI() {
     teamsScrollWidget->setLayout(teamsLayout);
     teamsScrollArea->setWidget(teamsScrollWidget);
 
-    // Buttons Layout
     QHBoxLayout *buttonsLayout = new QHBoxLayout();
     addTeamButton = new QPushButton(tr("Add Team"), this);
     removeTeamButton = new QPushButton(tr("Remove Team"), this);
@@ -163,9 +170,10 @@ void TeamAssemblyDialog::setupUI() {
     mainLayout->addLayout(buttonsLayout);
 }
 
-
+/**
+ * @brief Loads the active players and their team assignments from the database.
+ */
 void TeamAssemblyDialog::loadActivePlayers() {
-    // Clear all internal data and UI elements
     availablePlayersData.clear();
     teamsData.clear();
     activePlayersListWidget->clear();
@@ -183,7 +191,6 @@ void TeamAssemblyDialog::loadActivePlayers() {
         return;
     }
 
-    // Load teams from the database to build the UI
     QSqlQuery teamQuery(database);
     if (teamQuery.exec("SELECT id, name FROM teams ORDER BY id")) {
         while (teamQuery.next()) {
@@ -192,7 +199,6 @@ void TeamAssemblyDialog::loadActivePlayers() {
             team.name = teamQuery.value("name").toString();
             teamsData.push_back(team);
 
-            // Create the UI group box for this team
             QGroupBox *teamXGroupBox = new QGroupBox(tr("Team %1").arg(team.id));
             QVBoxLayout *teamXLayout = new QVBoxLayout(teamXGroupBox);
             
@@ -214,7 +220,6 @@ void TeamAssemblyDialog::loadActivePlayers() {
     }
 
     QSqlQuery query(database);
-    // Fetch active players and their team_id
     if (query.exec("SELECT id, name, handicap, team_id FROM players WHERE active = 1 ORDER BY name")) {
         while (query.next()) {
             PlayerInfo player;
@@ -223,24 +228,24 @@ void TeamAssemblyDialog::loadActivePlayers() {
             player.handicap = query.value("handicap").toInt();
             QVariant teamIdVariant = query.value("team_id");
             
-            int teamId = 0; // Default to 0 (no team or available)
+            int teamId = 0;
             if (!teamIdVariant.isNull()) {
                 teamId = teamIdVariant.toInt();
             }
 
-            if (teamId >= 1 && static_cast<size_t>(teamId) <= teamsData.size()) { // Player is assigned to a valid team
-                int teamIndex = teamId - 1; // Convert to 0-based index
+            if (teamId >= 1 && static_cast<size_t>(teamId) <= teamsData.size()) {
+                int teamIndex = teamId - 1;
                 if (teamIndex < teamsData.size()) {
                     teamsData[teamIndex].members.push_back(player);
-                    teamListWidgets[teamIndex]->addPlayer(player); // Add to UI
+                    teamListWidgets[teamIndex]->addPlayer(player);
                 } else {
                      qWarning() << "Player" << player.name << "has invalid team_id" << teamId << "from DB. Placing in available.";
                      availablePlayersData.push_back(player);
-                     activePlayersListWidget->addPlayer(player); // Add to UI
+                     activePlayersListWidget->addPlayer(player);
                 }
-            } else { // Player is not on a team (team_id is NULL or 0 or invalid)
+            } else {
                 availablePlayersData.push_back(player);
-                activePlayersListWidget->addPlayer(player); // Add to UI
+                activePlayersListWidget->addPlayer(player);
             }
         }
     } else {
@@ -248,12 +253,16 @@ void TeamAssemblyDialog::loadActivePlayers() {
     }
 }
 
+/**
+ * @brief Handles a player being dropped onto a list widget.
+ * @param player The player that was dropped.
+ * @param sourceList The list the player was dragged from.
+ * @param targetList The list the player was dropped onto.
+ */
 void TeamAssemblyDialog::handlePlayerDropped(const PlayerInfo& player, PlayerListWidget* sourceList, PlayerListWidget* targetList) {
-    // A drop within the same list is just a reorder. No data model change needed.
     if (!sourceList || !targetList || sourceList == targetList)
         return;
 
-    // Step 1: Find the source and target internal data vectors
     std::vector<PlayerInfo>* sourceData = nullptr;
     if (sourceList == activePlayersListWidget) {
         sourceData = &availablePlayersData;
@@ -283,7 +292,6 @@ void TeamAssemblyDialog::handlePlayerDropped(const PlayerInfo& player, PlayerLis
         return;
     }
 
-    // Step 2: Move the player from the source vector to the target vector
     sourceData->erase(std::remove_if(sourceData->begin(), sourceData->end(),
                                      [&](const PlayerInfo& p) { return p.id == player.id; }),
                       sourceData->end());
@@ -291,9 +299,11 @@ void TeamAssemblyDialog::handlePlayerDropped(const PlayerInfo& player, PlayerLis
     targetData->push_back(player);
 }
 
+/**
+ * @brief Automatically assigns all players to teams.
+ */
 void TeamAssemblyDialog::autoAssignTeams() {
     std::vector<PlayerInfo> allPlayersToAssign;
-    // Consolidate from internal models, as UI might not be source of truth during this operation
     for (const auto& p : availablePlayersData) allPlayersToAssign.push_back(p);
     for (const auto& team : teamsData) {
         for (const auto& p : team.members) allPlayersToAssign.push_back(p);
@@ -311,7 +321,6 @@ void TeamAssemblyDialog::autoAssignTeams() {
     std::mt19937 g(rd());
     std::shuffle(allPlayersToAssign.begin(), allPlayersToAssign.end(), g);
 
-    // Clear existing internal team data and UI lists
     activePlayersListWidget->clear();
     availablePlayersData.clear();
     for(auto& team : teamsData) team.members.clear();
@@ -323,7 +332,6 @@ void TeamAssemblyDialog::autoAssignTeams() {
         teamIdx = (teamIdx + 1) % teamsData.size(); 
     }
 
-    // Repopulate UI lists from the new internal models
     for(const auto& player : availablePlayersData) { 
         activePlayersListWidget->addPlayer(player);
     }
@@ -335,15 +343,17 @@ void TeamAssemblyDialog::autoAssignTeams() {
     QMessageBox::information(this, tr("Auto-Assign Complete"), tr("Players have been distributed into teams."));
 }
 
+/**
+ * @brief Saves the current team assignments to the database.
+ */
 void TeamAssemblyDialog::saveTeams() {
     if (!database.isOpen()) {
         QMessageBox::critical(this, tr("Database Error"), tr("Database is not open. Cannot save teams."));
         return;
     }
 
-    QSqlDatabase::database().transaction(); // Start a transaction for atomic updates
+    QSqlDatabase::database().transaction();
 
-    // First, clear existing teams and re-insert to handle additions/deletions
     QSqlQuery clearTeamsQuery(database);
     if (!clearTeamsQuery.exec("DELETE FROM teams")) {
         qWarning() << "Failed to clear teams table:" << clearTeamsQuery.lastError().text();
@@ -353,7 +363,6 @@ void TeamAssemblyDialog::saveTeams() {
 
     bool allSuccessful = true;
 
-    // Save the team names and player assignments
     for (size_t i = 0; i < teamsData.size(); ++i) {
         QSqlQuery teamInsertQuery(database);
         teamInsertQuery.prepare("INSERT INTO teams (id, name) VALUES (:id, :name)");
@@ -376,7 +385,6 @@ void TeamAssemblyDialog::saveTeams() {
         }
     }
 
-    // Update players in the "available" list (set team_id to NULL)
     for (const auto& player : availablePlayersData) {
         QSqlQuery query(database);
         query.prepare("UPDATE players SET team_id = NULL WHERE id = :playerId");
@@ -393,10 +401,10 @@ void TeamAssemblyDialog::saveTeams() {
         } else {
             QMessageBox::critical(this, tr("Transaction Error"), tr("Failed to commit team assignments to the database: %1").arg(QSqlDatabase::database().lastError().text()));
             qWarning() << "Transaction commit failed:" << QSqlDatabase::database().lastError().text();
-             QSqlDatabase::database().rollback(); // Rollback on commit failure
+             QSqlDatabase::database().rollback();
         }
     } else {
-        QSqlDatabase::database().rollback(); // Rollback if any query failed
+        QSqlDatabase::database().rollback();
         QMessageBox::warning(this, tr("Save Failed"), tr("Some team assignments could not be saved. Changes have been rolled back. Check console for errors."));
         qWarning() << "One or more team assignment saves failed. Transaction rolled back.";
     }
