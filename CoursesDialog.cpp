@@ -1,9 +1,24 @@
+/**
+ * @file CoursesDialog.cpp
+ * @brief Implements the CoursesDialog class.
+ */
+
 #include "CoursesDialog.h"
 #include "SpinBoxDelegate.h"
 #include "CheckBoxDelegate.h"
 #include <QtWidgets>
 #include <QtSql>
 
+/**
+ * @brief Constructs a CoursesDialog object.
+ *
+ * This constructor initializes the UI components, models, and views for the
+ * courses dialog. It sets up the layout and connects signals and slots for
+ * user interaction.
+ *
+ * @param db The database connection to use.
+ * @param parent The parent widget.
+ */
 CoursesDialog::CoursesDialog(QSqlDatabase &db, QWidget *parent)
     : QDialog(parent)
     , database(db)
@@ -92,11 +107,25 @@ CoursesDialog::CoursesDialog(QSqlDatabase &db, QWidget *parent)
 }
 }
 
+/**
+ * @brief Handles the selection change in the course view.
+ *
+ * When a course is selected, this slot updates the holes view to display
+ * the data for the selected course.
+ *
+ * @param current The index of the currently selected item.
+ */
 void CoursesDialog::onCourseSelectionChanged(const QModelIndex &current) {
     int cid = courseModel->data(courseModel->index(current.row(), 0)).toInt();
     holesTransposedModel->setCourseId(cid);
 }
 
+/**
+ * @brief Adds a new course to the database.
+ *
+ * This slot is called when the "Add" button is clicked. It inserts a new course
+ * with default values and populates it with 18 holes.
+ */
 void CoursesDialog::addCourse() {
     // 1) Insert the new course row
     int row = courseModel->rowCount();
@@ -129,6 +158,12 @@ void CoursesDialog::addCourse() {
     onCourseSelectionChanged(courseModel->index(row, 0));
 }
 
+/**
+ * @brief Removes the selected course from the database.
+ *
+ * This slot is called when the "Remove" button is clicked. It removes the
+ * selected course and its associated hole data from the database.
+ */
 void CoursesDialog::removeSelected() {
     QModelIndexList selected = courseView->selectionModel()->selectedRows();
     if (selected.isEmpty()) 
@@ -150,6 +185,13 @@ void CoursesDialog::removeSelected() {
     courseModel->select(); 
 }
 
+/**
+ * @brief Exports course and hole data to CSV files.
+ *
+ * This slot is called when the "Export" button is clicked. It prompts the user
+ * for a file location and exports the course list and all hole data into
+ * separate CSV files.
+ */
 void CoursesDialog::exportData() {
     // Use QFileDialog to get the base file path from the user
     QString baseFilePath = QFileDialog::getSaveFileName(this,

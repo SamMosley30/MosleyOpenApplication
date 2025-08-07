@@ -1,20 +1,21 @@
+/**
+ * @file PlayerListWidget.cpp
+ * @brief Implements the PlayerListWidget class.
+ */
+
 #include "PlayerListWidget.h"
 #include <QDebug>
-#include <QApplication> // For QApplication::startDragDistance()
-#include <QDataStream>  // For serializing PlayerInfo
-#include <QMimeData>    // For QMimeData
-#include <QDrag>        // For QDrag
-#include <QMouseEvent>  // For QMouseEvent / QDragEnterEvent etc.
+#include <QApplication>
+#include <QDataStream>
+#include <QMimeData>
+#include <QDrag>
+#include <QMouseEvent>
 
 PlayerListWidget::PlayerListWidget(QWidget *parent)
     : QListWidget(parent), draggedItem(nullptr) {
-    setDragEnabled(true);       
-    setAcceptDrops(true);       
-    setDropIndicatorShown(true); 
-    // We are manually handling the move/copy logic in conjunction with QDrag,
-    // so explicit setDefaultDropAction() or setDragDropMode() might interfere
-    // or be redundant if not carefully managed with the overridden events.
-    // The key is how drag->exec() and our dropEvent interact.
+    setDragEnabled(true);
+    setAcceptDrops(true);
+    setDropIndicatorShown(true);
 }
 
 PlayerInfo PlayerListWidget::getPlayerInfoFromItem(QListWidgetItem *item) const {
@@ -24,18 +25,16 @@ PlayerInfo PlayerListWidget::getPlayerInfoFromItem(QListWidgetItem *item) const 
         player.name = item->text();
         player.handicap = item->data(Qt::UserRole + 1).toInt();
     } else {
-        player.id = -1; 
+        player.id = -1;
     }
     return player;
 }
 
 void PlayerListWidget::addPlayer(const PlayerInfo& player) {
-    // Check if a player with the same ID already exists to prevent UI duplicates
-    // This is a safeguard, the main duplication is handled in dropEvent for self-drops.
     for (int i = 0; i < count(); ++i) {
         if (item(i)->data(Qt::UserRole).toInt() == player.id) {
             qDebug() << "PlayerListWidget::addPlayer - Player" << player.name << "already exists in this list. Not re-adding.";
-            return; 
+            return;
         }
     }
     QListWidgetItem *item = new QListWidgetItem(player.name, this);
@@ -43,24 +42,20 @@ void PlayerListWidget::addPlayer(const PlayerInfo& player) {
     item->setData(Qt::UserRole + 1, player.handicap);
 }
 
-// --- Dragging FROM this list ---
-
 void PlayerListWidget::mousePressEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton) {
-        startPos = event->pos(); 
-        draggedItem = itemAt(event->pos()); 
+        startPos = event->pos();
+        draggedItem = itemAt(event->pos());
     }
-    QListWidget::mousePressEvent(event); 
+    QListWidget::mousePressEvent(event);
 }
 
 void PlayerListWidget::mouseMoveEvent(QMouseEvent *event) {
     if ((event->buttons() & Qt::LeftButton) && draggedItem) {
         if ((event->pos() - startPos).manhattanLength() >= QApplication::startDragDistance()) {
-            startDrag(); // Call our drag initiation
+            startDrag();
         }
     }
-    // No call to QListWidget::mouseMoveEvent(event) here, as we are fully handling
-    // the drag initiation if conditions are met. If not met, default behavior is fine.
 }
 
 void PlayerListWidget::startDrag() {
@@ -76,34 +71,29 @@ void PlayerListWidget::startDrag() {
     }
 
     QMimeData *mimeData = new QMimeData;
-    QByteArray itemDataByteArray; // Renamed for clarity
+    QByteArray itemDataByteArray;
     QDataStream dataStream(&itemDataByteArray, QIODevice::WriteOnly);
     dataStream << player.id << player.name << player.handicap;
 
     mimeData->setData(PLAYER_MIME_TYPE, itemDataByteArray);
-    mimeData->setText(player.name); 
+    mimeData->setText(player.name);
 
     QDrag *drag = new QDrag(this);
     drag->setMimeData(mimeData);
 
-    // If the move is successful, remove the item from the source list.
     if (drag->exec(Qt::MoveAction) == Qt::MoveAction) {
-        // FIX: Manually delete the item from the source list widget.
         delete takeItem(row(draggedItem));
     } else {
         qDebug() << "PlayerListWidget (" << this->objectName() << "): Drag for" << player.name << "did not result in MoveAction (e.g., cancelled).";
     }
-    draggedItem = nullptr; // Reset after drag operation
+    draggedItem = nullptr;
 }
-
-
-// --- Dropping ONTO this list ---
 
 void PlayerListWidget::dragEnterEvent(QDragEnterEvent *event) {
     if (event->mimeData()->hasFormat(PLAYER_MIME_TYPE)) {
-        event->acceptProposedAction(); 
+        event->acceptProposedAction();
     } else {
-        event->ignore(); 
+        event->ignore();
     }
 }
 
@@ -124,23 +114,20 @@ void PlayerListWidget::dropEvent(QDropEvent *event) {
 
     PlayerListWidget *sourceListWidget = qobject_cast<PlayerListWidget*>(event->source());
 
-    // Case 1: Drag and drop within the SAME list (reordering)
     if (sourceListWidget == this) {
         event->acceptProposedAction();
-        return; 
+        return;
     }
 
-    // Case 2: Drop from a DIFFERENT PlayerListWidget
     QByteArray itemDataByteArray = event->mimeData()->data(PLAYER_MIME_TYPE);
     QDataStream dataStream(&itemDataByteArray, QIODevice::ReadOnly);
     PlayerInfo player;
     dataStream >> player.id >> player.name >> player.handicap;
 
     if (player.id != -1) {
-        this->addPlayer(player); // Add the player to this (target) list's UI
-        event->acceptProposedAction(); // Accept the drop action.
-        
-        emit playerDropped(player, sourceListWidget, this); 
+        this->addPlayer(player);
+        event->acceptProposedAction();
+        emit playerDropped(player, sourceListWidget, this);
     } else {
         qDebug() << "PlayerListWidget (" << this->objectName() << "): Drop ignored - invalid player ID from MIME data.";
         event->ignore();

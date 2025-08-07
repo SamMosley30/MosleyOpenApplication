@@ -1,62 +1,78 @@
+/**
+ * @file ScoreEntryDialog.h
+ * @brief Contains the declaration of the ScoreEntryDialog class.
+ */
+
 #ifndef SCOREENTRYDIALOG_H
 #define SCOREENTRYDIALOG_H
 
 #include <QDialog>
-#include <QSqlDatabase> // To receive the database connection name
+#include <QSqlDatabase>
 #include <QTabWidget>
 #include <QComboBox>
 #include <QTableView>
-#include <QVBoxLayout> // For layout management
-#include <QHBoxLayout> // For layout management
-#include <QLabel>      // For labels next to combo boxes
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QLabel>
 
-#include "ScoreTableModel.h" // Include the ScoreTableModel header
+#include "ScoreTableModel.h"
 
+/**
+ * @class ScoreEntryDialog
+ * @brief A dialog for entering scores for each day of the tournament.
+ *
+ * This dialog provides a tabbed interface for entering scores for Day 1, Day 2,
+ * and Day 3. Each tab contains a table view for score entry and a combo box
+ * to select the course for that day.
+ */
 class ScoreEntryDialog : public QDialog
 {
-    Q_OBJECT // Required for signals and slots
+    Q_OBJECT
 
 public:
-    // Constructor takes the database connection name
+    /**
+     * @brief Constructs a ScoreEntryDialog object.
+     * @param connectionName The name of the database connection to use.
+     * @param parent The parent widget.
+     */
     explicit ScoreEntryDialog(const QString &connectionName, QWidget *parent = nullptr);
+
+    /**
+     * @brief Destroys the ScoreEntryDialog object.
+     */
     ~ScoreEntryDialog();
 
 private slots:
-    // Slots to handle course selection changes for each day
     void onDay1CourseSelected(int index);
     void onDay2CourseSelected(int index);
     void onDay3CourseSelected(int index);
     void clearData();
 
 private:
-    QString m_connectionName; // Stores the database connection name
+    QString m_connectionName; ///< The name of the database connection.
 
-    QTabWidget *tabWidget; // The main tab widget for days
+    QTabWidget *tabWidget; ///< The main tab widget for days.
 
-    // Widgets for Day 1 Tab
+    // Day 1 Tab Widgets
     QWidget *day1Tab;
     QComboBox *day1CourseComboBox;
     QTableView *day1TableView;
-    ScoreTableModel *day1ScoreModel; // Model for Day 1 scores
+    ScoreTableModel *day1ScoreModel;
 
-    // Widgets for Day 2 Tab
+    // Day 2 Tab Widgets
     QWidget *day2Tab;
     QComboBox *day2CourseComboBox;
     QTableView *day2TableView;
-    ScoreTableModel *day2ScoreModel; // Model for Day 2 scores
+    ScoreTableModel *day2ScoreModel;
 
-    // Widgets for Day 3 Tab
+    // Day 3 Tab Widgets
     QWidget *day3Tab;
     QComboBox *day3CourseComboBox;
     QTableView *day3TableView;
-    ScoreTableModel *day3ScoreModel; // Model for Day 3 scores
+    ScoreTableModel *day3ScoreModel;
 
-    // Helper method to populate course combo boxes
     void populateCourseComboBoxes();
-
-    // Helper method to get database connection
     QSqlDatabase database() const;
-    
     void loadSavedCourseSelections();
     void saveCourseSelection(int dayNum, int courseId);
     int getSavedCourseSelection(int dayNum);

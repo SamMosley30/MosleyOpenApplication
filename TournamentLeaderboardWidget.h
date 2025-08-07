@@ -1,3 +1,8 @@
+/**
+ * @file TournamentLeaderboardWidget.h
+ * @brief Contains the declaration of the TournamentLeaderboardWidget class.
+ */
+
 #ifndef TOURNAMENTLEADERBOARDWIDGET_H
 #define TOURNAMENTLEADERBOARDWIDGET_H
 
@@ -7,10 +12,6 @@
 #include <QVBoxLayout>
 #include <QHeaderView>
 #include <QSet>
-
-#include "tournamentleaderboardmodel.h" // Include the model header
-
-// Include QPainter related headers for the export functionality
 #include <QPainter>
 #include <QPixmap>
 #include <QImage>
@@ -18,35 +19,34 @@
 #include <QMessageBox>
 #include <QDir>
 
+#include "tournamentleaderboardmodel.h"
 
+/**
+ * @class TournamentLeaderboardWidget
+ * @brief A widget for displaying a tournament leaderboard.
+ *
+ * This widget contains a table view that displays the data from a
+ * TournamentLeaderboardModel. It also provides functionality to refresh the data
+ * and export the leaderboard as an image.
+ */
 class TournamentLeaderboardWidget : public QWidget
 {
-    Q_OBJECT // Required for signals and slots
+    Q_OBJECT
 
 public:
-    // Constructor takes the database connection name
     explicit TournamentLeaderboardWidget(const QString &connectionName, QWidget *parent = nullptr);
     ~TournamentLeaderboardWidget();
 
-    // Public method to refresh the leaderboard data
     void refreshData();
-
-    // Public method to export the leaderboard as an image
     QImage exportToImage() const;
-    TournamentLeaderboardModel *leaderboardModel; // The model for this leaderboard
+    TournamentLeaderboardModel *leaderboardModel;
 
 private:
-    QString m_connectionName; // Stores the database connection name
+    QString m_connectionName;
+    QTableView *leaderboardView;
 
-    QTableView *leaderboardView; // The view to display this leaderboard
-
-    // Helper method to get database connection
     QSqlDatabase database() const;
-
-    // Helper to configure the table view settings
     void configureTableView();
-
-    // Helper to update column visibility based on scores (for daily columns in overall)
     void updateColumnVisibility();
 };
 

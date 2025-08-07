@@ -1,20 +1,24 @@
-#include "TournamentLeaderboardWidget.h" 
-#include "TournamentLeaderboardModel.h" 
+/**
+ * @file TournamentLeaderboardWidget.cpp
+ * @brief Implements the TournamentLeaderboardWidget class.
+ */
+
+#include "TournamentLeaderboardWidget.h"
+#include "TournamentLeaderboardModel.h"
 
 #include <QSqlDatabase>
 #include <QDebug>
-#include <QPainter> 
-#include <QFileDialog> 
-#include <QMessageBox> 
-#include <QVBoxLayout> // Required for QVBoxLayout
-#include <QTableView>   // Required for QTableView
+#include <QPainter>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QVBoxLayout>
+#include <QTableView>
 #include <QSqlError>
 
-// Constructor for TournamentLeaderboardWidget (used by Mosley & Twisted Creek tabs)
 TournamentLeaderboardWidget::TournamentLeaderboardWidget(const QString &connectionName, QWidget *parent)
     : QWidget(parent),
-      m_connectionName(connectionName), // (1) Parameter 'connectionName' is stored in member 'm_connectionName'
-      leaderboardModel(nullptr),      // Initialize pointers to nullptr
+      m_connectionName(connectionName),
+      leaderboardModel(nullptr),
       leaderboardView(nullptr) {
 
     QString nameToPassToModel = this->m_connectionName;
@@ -22,7 +26,7 @@ TournamentLeaderboardWidget::TournamentLeaderboardWidget(const QString &connecti
 
     this->leaderboardView = new QTableView(this);
 
-    leaderboardView->setModel(leaderboardModel); // Set model on view
+    leaderboardView->setModel(leaderboardModel);
     configureTableView();
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
@@ -42,6 +46,9 @@ QSqlDatabase TournamentLeaderboardWidget::database() const {
     return db_check;
 }
 
+/**
+ * @brief Configures the table view settings.
+ */
 void TournamentLeaderboardWidget::configureTableView() {
     if (!leaderboardView) return;
     leaderboardView->verticalHeader()->setVisible(false);
@@ -71,6 +78,9 @@ void TournamentLeaderboardWidget::refreshData() {
     updateColumnVisibility(); 
 }
 
+/**
+ * @brief Updates the visibility of the daily score columns.
+ */
 void TournamentLeaderboardWidget::updateColumnVisibility() {
     if (!leaderboardModel || !leaderboardView) return; 
 
@@ -86,7 +96,6 @@ void TournamentLeaderboardWidget::updateColumnVisibility() {
     leaderboardView->setColumnHidden(7, !day3HasScores); 
     leaderboardView->setColumnHidden(8, !day3HasScores);
 }
-
 
 QImage TournamentLeaderboardWidget::exportToImage() const {
     if (!leaderboardModel || !leaderboardView) return QImage();
@@ -121,14 +130,14 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
     painter.setPen(Qt::white);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    QString leaderboardTitle = "Leaderboard"; // Generic title
-    // Potentially get a more specific title if the dialog sets one on the widget
-    if (!this->windowTitle().isEmpty() && this->windowTitle() != "QWidget") 
+    QString leaderboardTitle = "Leaderboard";
+    if (!this->windowTitle().isEmpty() && this->windowTitle() != "QWidget") {
         leaderboardTitle = this->windowTitle();
-    else if (leaderboardModel->getTournamentContext() == TournamentLeaderboardModel::MosleyOpen) 
+    } else if (leaderboardModel->getTournamentContext() == TournamentLeaderboardModel::MosleyOpen) {
         leaderboardTitle = "Mosley Open";
-    else if (leaderboardModel->getTournamentContext() == TournamentLeaderboardModel::TwistedCreek) 
+    } else if (leaderboardModel->getTournamentContext() == TournamentLeaderboardModel::TwistedCreek) {
         leaderboardTitle = "Twisted Creek";
+    }
 
     painter.setFont(QFont("Arial", 32, QFont::Bold));
     QRect titleRect(padding, padding, totalWidth - 2 * padding, titleHeight);
@@ -156,8 +165,9 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
     for (int row = 0; row < rowCount; ++row) {
         currentX = padding;
         QColor rowColor = (row % 2 == 0) ? Qt::white : QColor(240, 240, 240);
-        if (leaderboardModel->data(leaderboardModel->index(row, 0), Qt::DisplayRole).toInt() <= 3)
+        if (leaderboardModel->data(leaderboardModel->index(row, 0), Qt::DisplayRole).toInt() <= 3) {
             rowColor = QColor(255, 165, 0, 255);
+        }
         
         int visibleRowWidth = 0;
         for(int col_idx = 0; col_idx < colCount; ++col_idx) {
@@ -180,7 +190,6 @@ QImage TournamentLeaderboardWidget::exportToImage() const {
         currentY += rowHeight;
     }
 
-    // Draw the vertical lines
     currentX = padding;
     currentY = padding + titleHeight + headerHeight;
     painter.drawLine(currentX, padding, currentX, totalHeight - padding);

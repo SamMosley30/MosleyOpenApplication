@@ -1,3 +1,8 @@
+/**
+ * @file DailyLeaderboardModel.h
+ * @brief Contains the declaration of the DailyLeaderboardModel class.
+ */
+
 #ifndef DAILYLEADERBOARDMODEL_H
 #define DAILYLEADERBOARDMODEL_H
 
@@ -8,72 +13,104 @@
 #include <QString>
 #include <QMap>
 #include <QPair>
-#include <QDebug> // For debugging
+#include <QDebug>
 
 #include "CommonStructs.h"
 
-// Structure to hold a row of calculated daily leaderboard data
+/**
+ * @struct DailyLeaderboardRow
+ * @brief Holds a row of calculated daily leaderboard data.
+ */
 struct DailyLeaderboardRow {
-    int playerId;
-    QString playerName;
-    int dailyTotalPoints; // Total points for this day
-    int dailyNetPoints;   // Net points for this day (Total - Handicap)
-    int rank;             // Player's rank on this daily leaderboard
-    // Add other calculated metrics here if needed (e.g., Daily Gross Score)
+    int playerId;           ///< The unique identifier for the player.
+    QString playerName;     ///< The name of the player.
+    int dailyTotalPoints;   ///< Total Stableford points for the day.
+    int dailyNetPoints;     ///< Net Stableford points for the day (Total - Handicap).
+    int rank;               ///< The player's rank on the daily leaderboard.
 };
 
+/**
+ * @class DailyLeaderboardModel
+ * @brief A model for calculating and displaying a daily leaderboard.
+ *
+ * This model fetches player scores for a specific day, calculates Stableford points,
+ * ranks the players, and provides the data to a view.
+ */
 class DailyLeaderboardModel : public QAbstractTableModel
 {
-    Q_OBJECT // Required for signals and slots
+    Q_OBJECT
 
 public:
-    // Constructor takes the database connection name and the day number
+    /**
+     * @brief Constructs a DailyLeaderboardModel object.
+     * @param connectionName The name of the database connection to use.
+     * @param dayNum The day number (1, 2, or 3) this model represents.
+     * @param parent The parent object.
+     */
     explicit DailyLeaderboardModel(const QString &connectionName, int dayNum, QObject *parent = nullptr);
+
+    /**
+     * @brief Destroys the DailyLeaderboardModel object.
+     */
     ~DailyLeaderboardModel();
 
-    // === Required QAbstractTableModel methods ===
+    // QAbstractTableModel overrides
     int rowCount(const QModelIndex &parent = QModelIndex()) const override;
     int columnCount(const QModelIndex &parent = QModelIndex()) const override;
     QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     QVariant headerData(int section, Qt::Orientation orientation, int role = Qt::DisplayRole) const override;
 
-    // === Public method to refresh data and recalculate leaderboard ===
+    /**
+     * @brief Refreshes the data and recalculates the leaderboard.
+     *
+     * This method fetches the latest data from the database and recalculates the
+     * entire leaderboard.
+     */
     void refreshData();
 
-    // Public method to get the day number this model represents
+    /**
+     * @brief Gets the day number this model represents.
+     * @return The day number.
+     */
     int getDayNum() const { return m_dayNum; }
 
-    // Helper to get the model column index for a specific data type
+    /** @brief Gets the column index for the rank. */
     int getColumnForRank() const { return 0; }
+    /** @brief Gets the column index for the player name. */
     int getColumnForPlayerName() const { return 1; }
+    /** @brief Gets the column index for the daily total points. */
     int getColumnForDailyTotalPoints() const { return 2; }
+    /** @brief Gets the column index for the daily net points. */
     int getColumnForDailyNetPoints() const { return 3; }
 
 private:
-    QString m_connectionName; // Stores the name of the database connection
-    int m_dayNum;             // The day number this model represents (1, 2, or 3)
-    QVector<DailyLeaderboardRow> m_leaderboardData; // Stores the calculated leaderboard rows
+    QString m_connectionName; ///< The name of the database connection.
+    int m_dayNum;             ///< The day number this model represents (1, 2, or 3).
+    QVector<DailyLeaderboardRow> m_leaderboardData; ///< Stores the calculated leaderboard rows.
 
-    // Internal data structures to hold raw data fetched from DB for calculations
-    QMap<int, PlayerInfo> m_allPlayers; // Map<PlayerId, PlayerInfo> for all active players
-    QMap<QPair<int, int>, QPair<int, int>> m_allHoleDetails; // Map<Pair<CourseId, HoleNum>, Pair<Par, Handicap>>
-    // Stores scores for this day: Map<PlayerId, Map<HoleNum, Pair<Score, CourseId>>>
-    QMap<int, QMap<int, QPair<int, int>>> m_dailyScores;
+    // Internal data structures for calculations
+    QMap<int, PlayerInfo> m_allPlayers; ///< Map of PlayerId to PlayerInfo for all active players.
+    QMap<QPair<int, int>, QPair<int, int>> m_allHoleDetails; ///< Map of <CourseId, HoleNum> to <Par, Handicap>.
+    QMap<int, QMap<int, QPair<int, int>>> m_dailyScores; ///< Map of PlayerId to a map of <HoleNum, <Score, CourseId>>.
 
-    // === Private helper methods ===
-    QSqlDatabase database() const; // Helper to get database connection by name
+    /**
+     * @brief Gets the database connection by name.
+     * @return The QSqlDatabase object.
+     */
+    QSqlDatabase database() const;
 
-    // Methods to fetch raw data from the database
+    // Private helper methods for data fetching and calculation
     void fetchAllPlayers();
     void fetchAllHoleDetails();
-    void fetchDailyScores(); // Fetches scores only for the specific day
-
-    // Method to perform Stableford calculations and ranking for the day
+    void fetchDailyScores();
     void calculateLeaderboard();
 
-    // Helper to get DailyLeaderboardRow by row index in m_leaderboardData
+    /**
+     * @brief Gets the leaderboard row data for a given row index.
+     * @param row The row index.
+     * @return A pointer to the DailyLeaderboardRow, or nullptr if the index is invalid.
+     */
     const DailyLeaderboardRow* getLeaderboardRow(int row) const;
-    // Add helpers for other columns if added to DailyLeaderboardRow
 };
 
 #endif // DAILYLEADERBOARDMODEL_H

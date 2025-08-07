@@ -1,14 +1,24 @@
+/**
+ * @file TeamLeaderboardModel.cpp
+ * @brief Implements the TeamLeaderboardModel class.
+ */
+
 #include "TeamLeaderboardModel.h"
 #include "utils.h"
 #include <QSqlQuery>
 #include <QSqlError>
-#include <algorithm> // For std::sort, std::greater, std::max_element
-#include <cmath>     // For std::ceil
+#include <algorithm>
+#include <cmath>
 #include <ranges>
 #include <functional>
 #include <numeric>
 
-// Helper function to calculate strokes. This isolates a piece of logic.
+/**
+ * @brief Calculates the number of strokes a player receives on a hole.
+ * @param handicapForCalc The player's handicap.
+ * @param holeHcIndex The handicap index of the hole.
+ * @return The number of strokes received.
+ */
 int calculateStrokesReceived(int handicapForCalc, int holeHcIndex) {
     if (handicapForCalc <= 36) {
         int effective = 36 - handicapForCalc;
@@ -42,8 +52,7 @@ int TeamLeaderboardModel::rowCount(const QModelIndex &parent) const {
 
 int TeamLeaderboardModel::columnCount(const QModelIndex &parent) const {
     Q_UNUSED(parent);
-    // Columns: Rank, Team Name, Day 1 Pts, Day 2 Pts, Day 3 Pts, Overall Pts
-    return 6;
+    return 6; // Rank, Team Name, Day 1 Pts, Day 2 Pts, Day 3 Pts, Overall Pts
 }
 
 QVariant TeamLeaderboardModel::data(const QModelIndex &index, int role) const {
@@ -57,13 +66,10 @@ QVariant TeamLeaderboardModel::data(const QModelIndex &index, int role) const {
     if (role == Qt::DisplayRole) {
         switch (index.column()) {
             case 0: return teamRow.rank > 0 ? QVariant(teamRow.rank) : QVariant("-");
-            case 1: return teamRow.teamName; // This will now be "Team <Captain>"
-            case 2: // Day 1 Points
-                return teamRow.dailyTeamStablefordPoints.value(1, 0); 
-            case 3: // Day 2 Points
-                return teamRow.dailyTeamStablefordPoints.value(2, 0);
-            case 4: // Day 3 Points
-                return teamRow.dailyTeamStablefordPoints.value(3, 0);
+            case 1: return teamRow.teamName;
+            case 2: return teamRow.dailyTeamStablefordPoints.value(1, 0);
+            case 3: return teamRow.dailyTeamStablefordPoints.value(2, 0);
+            case 4: return teamRow.dailyTeamStablefordPoints.value(3, 0);
             case 5: return teamRow.overallTeamStablefordPoints;
             default: return QVariant();
         }
@@ -101,11 +107,10 @@ void TeamLeaderboardModel::refreshData() {
     m_daysWithScores.clear();
     m_leaderboardData.clear();
 
-    fetchAllPlayersAndAssignments(); // This will populate m_allPlayers and m_playerTeamAssignments
-                                     // And now also populate teamRow.teamMembers
+    fetchAllPlayersAndAssignments();
     fetchAllHoleDetails();
     fetchAllScores();
-    calculateTeamLeaderboard();      // Calculates scores using team members
+    calculateTeamLeaderboard();
 
     endResetModel();
 }
@@ -114,6 +119,9 @@ QSet<int> TeamLeaderboardModel::getDaysWithScores() const {
     return m_daysWithScores;
 }
 
+/**
+ * @brief Fetches all players and their team assignments from the database.
+ */
 void TeamLeaderboardModel::fetchAllPlayersAndAssignments() {
     QSqlDatabase db = database();
     if (!db.isValid() || !db.isOpen()) {
@@ -121,7 +129,6 @@ void TeamLeaderboardModel::fetchAllPlayersAndAssignments() {
         return;
     }
 
-    // First, fetch all team names and populate the leaderboard data
     QSqlQuery teamNameQuery(db);
     if (teamNameQuery.exec("SELECT id, name FROM teams ORDER BY id")) {
         while (teamNameQuery.next()) {
@@ -142,14 +149,13 @@ void TeamLeaderboardModel::fetchAllPlayersAndAssignments() {
             PlayerInfo player;
             player.id = query.value("id").toInt();
             player.name = query.value("name").toString();
-            player.handicap = query.value("handicap").toInt(); // This is the "point target"
+            player.handicap = query.value("handicap").toInt();
             m_allPlayers[player.id] = player;
 
             QVariant teamIdVariant = query.value("team_id");
             if (!teamIdVariant.isNull()) {
                 int teamId = teamIdVariant.toInt();
                 m_playerTeamAssignments[player.id] = teamId;
-                // Find the team in m_leaderboardData and add the player
                 auto it = std::ranges::find_if(m_leaderboardData,
                                        [teamId](const TeamLeaderboardRow& row) {
                                            return row.teamId == teamId;
@@ -164,6 +170,9 @@ void TeamLeaderboardModel::fetchAllPlayersAndAssignments() {
     }
 }
 
+/**
+ * @brief Fetches details for all holes from the database.
+ */
 void TeamLeaderboardModel::fetchAllHoleDetails() {
     QSqlDatabase db = database();
     if (!db.isValid() || !db.isOpen()) return;
@@ -178,6 +187,9 @@ void TeamLeaderboardModel::fetchAllHoleDetails() {
     }
 }
 
+/**
+ * @brief Fetches all scores from the database.
+ */
 void TeamLeaderboardModel::fetchAllScores() {
     QSqlDatabase db = database();
     if (!db.isValid() || !db.isOpen()) return;
@@ -197,16 +209,20 @@ void TeamLeaderboardModel::fetchAllScores() {
     }
 }
 
-// Helper to get a single player's net stableford score for a specific hole.
-// Returns an empty optional if the player has no score for that hole.
+/**
+ * @brief Gets a single player's net stableford score for a specific hole.
+ * @param member The player.
+ * @param dayNum The day number.
+ * @param holeNum The hole number.
+ * @return The player's net stableford score, or an empty optional if not available.
+ */
 std::optional<int> TeamLeaderboardModel::getPlayerNetStablefordForHole(
     const PlayerInfo& member, int dayNum, int holeNum) const
 {
-    // Check if the player has a score for this specific day and hole
     if (!m_allScores.contains(member.id) ||
         !m_allScores[member.id].contains(dayNum) ||
         !m_allScores[member.id][dayNum].contains(holeNum)) {
-        return std::nullopt; // No score available
+        return std::nullopt;
     }
 
     const auto& scoreInfo = m_allScores[member.id][dayNum][holeNum];
@@ -215,94 +231,87 @@ std::optional<int> TeamLeaderboardModel::getPlayerNetStablefordForHole(
 
     const auto& holeDetailsKey = qMakePair(courseIdForScore, holeNum);
     if (!m_allHoleDetails.contains(holeDetailsKey)) {
-        return std::nullopt; // Hole details missing
+        return std::nullopt;
     }
 
     const auto& holeDetails = m_allHoleDetails[holeDetailsKey];
     int par = holeDetails.first;
     int holeHcIndex = holeDetails.second;
 
-    // For team scoring, always use the player's actual handicap (Twisted Creek rules)
     int strokesReceived = calculateStrokesReceived(member.handicap, holeHcIndex);
     int netPlayerScore = playerScoreGross - strokesReceived;
     
-    // Pass the calculated net score to the basic Stableford points function
-    if (stableford_conversion.contains(netPlayerScore - par))
+    if (stableford_conversion.contains(netPlayerScore - par)) {
         return stableford_conversion.at(netPlayerScore - par);
-    else
+    } else {
         qDebug() << "Invalid score " << netPlayerScore << "on par " << par;
         return std::nullopt;
+    }
 }
 
+/**
+ * @brief Calculates the team score for a single hole.
+ * @param team The team.
+ * @param dayNum The day number.
+ * @param holeNum The hole number.
+ * @param numScoresToTake The number of top scores to take.
+ * @return The team's score for the hole.
+ */
 int TeamLeaderboardModel::calculateTeamScoreForHole(TeamLeaderboardRow &team, int dayNum, int holeNum, int numScoresToTake) const
 {
-    // --- Ranges Pipeline to get scores for this hole ---
     auto scores_view = team.teamMembers
-                       // 1. Transform each team member into their potential score for this hole
                        | std::views::transform([&](const PlayerInfo &member)
                                                { return getPlayerNetStablefordForHole(member, dayNum, holeNum); })
-                       // 2. Filter out any members who didn't have a score
                        | std::views::filter([](const std::optional<int> &score)
                                             { return score.has_value(); })
-                       // 3. Transform the remaining optionals into their integer values
                        | std::views::transform([](const std::optional<int> &score)
                                                { return score.value(); });
 
-    // Materialize the view into a temporary vector to sort it.
     std::vector<int> scores_vec;
     std::ranges::copy(scores_view, std::back_inserter(scores_vec));
     std::ranges::sort(scores_vec, std::greater{});
 
-    // Sum the top N-1 scores for the hole (N being the size of the largest team)
     return std::ranges::fold_left(
         scores_vec | std::views::take(numScoresToTake),
         0,
         std::plus<>{});
 }
 
+/**
+ * @brief Calculates the team leaderboard.
+ */
 void TeamLeaderboardModel::calculateTeamLeaderboard()
 {
-    if (m_allPlayers.isEmpty() || m_allHoleDetails.isEmpty())
-    {
+    if (m_allPlayers.isEmpty() || m_allHoleDetails.isEmpty()) {
         qDebug() << "TeamLeaderboardModel: Not enough data to calculate (players or hole details missing).";
         return;
     }
 
-    // Determine the size of the largest team
     auto largestTeam = std::ranges::max(m_leaderboardData, [&](const TeamLeaderboardRow &a, const TeamLeaderboardRow &b)
                      { return a.teamMembers.size() < b.teamMembers.size(); });
 
-    // N-1 scores, with a minimum of 1
     int numScoresToTake = (largestTeam.teamMembers.size() > 1) ? largestTeam.teamMembers.size() - 1 : 1;
 
-    // Iterate over each day (1, 2, 3)
-    std::ranges::for_each(std::views::iota(1, 4), [&](int dayNum)
-    {
-        // Iterate over each team
-        std::ranges::for_each(m_leaderboardData, [&](TeamLeaderboardRow &teamRow)
-        {
+    std::ranges::for_each(std::views::iota(1, 4), [&](int dayNum) {
+        std::ranges::for_each(m_leaderboardData, [&](TeamLeaderboardRow &teamRow) {
             int teamDailyTotalStablefordPoints = 0;
-
-            // Iterate over each hole (1 to 18)
             std::ranges::for_each(std::views::iota(1, 19), [&](int holeNum)
                                   { teamDailyTotalStablefordPoints += calculateTeamScoreForHole(teamRow, dayNum, holeNum, numScoresToTake); });
             teamRow.dailyTeamStablefordPoints[dayNum] = teamDailyTotalStablefordPoints;
         }); 
     });
 
-    // Calculate overall points by summing the daily points for each team
     std::ranges::for_each(m_leaderboardData, [](TeamLeaderboardRow &teamRow)
                           { teamRow.overallTeamStablefordPoints = std::ranges::fold_left(teamRow.dailyTeamStablefordPoints, 0, std::plus<>{}); });
 
-    // --- Ranking logic (remains the same) ---
     std::ranges::sort(m_leaderboardData, [](const TeamLeaderboardRow &a, const TeamLeaderboardRow &b)
                       { return a.overallTeamStablefordPoints > b.overallTeamStablefordPoints; });
 
-    for (int i = 0; i < m_leaderboardData.size(); ++i)
-    {
-        if (i > 0 && m_leaderboardData[i].overallTeamStablefordPoints == m_leaderboardData[i - 1].overallTeamStablefordPoints)
+    for (int i = 0; i < m_leaderboardData.size(); ++i) {
+        if (i > 0 && m_leaderboardData[i].overallTeamStablefordPoints == m_leaderboardData[i - 1].overallTeamStablefordPoints) {
             m_leaderboardData[i].rank = m_leaderboardData[i - 1].rank;
-        else
+        } else {
             m_leaderboardData[i].rank = i + 1;
+        }
     }
 }

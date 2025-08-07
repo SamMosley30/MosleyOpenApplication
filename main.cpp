@@ -1,56 +1,63 @@
+/**
+ * @file main.cpp
+ * @brief The main entry point for the application.
+ */
+
 #include <QApplication>
 #include <QMessageBox>
 #include <QtSql>
-#include <QDebug> // Add this for qDebug
+#include <QDebug>
 #include <QStandardPaths>
 #include <QDir>
 #include <QFile>
 #include "MainWindow.h"
 
+/**
+ * @brief The main function of the application.
+ *
+ * This function initializes the application, sets up the database connection,
+ * creates the main window, and starts the event loop.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv The command-line arguments.
+ * @return The exit code of the application.
+ */
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
 
     QCoreApplication::setOrganizationName("Sammos");
     QCoreApplication::setApplicationName("MosleyOpen");
 
-    // 3. This new block finds/creates the writable database path
-    // Get the standard location for application data
     QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    qDebug() << "Writable path: " << dataPath; // DEBUG"
+    qDebug() << "Writable path: " << dataPath;
     QDir dataDir(dataPath);
 
-    // Create the directory if it doesn't exist
     if (!dataDir.exists()) {
         dataDir.mkpath(".");
     }
 
-    // Define the full path for the writable database
     QString dbPath = dataPath + "/tournament.db";
 
-    // Check if the database already exists in the writable location.
-    // If not, copy it from the application's installation directory (the template).
     if (!QFile::exists(dbPath)) {
         QString templatePath = QCoreApplication::applicationDirPath() + "/tournament.db";
-        qDebug() << "Template path: " << templatePath; // DEBUG
+        qDebug() << "Template path: " << templatePath;
         if (!QFile::copy(templatePath, dbPath)) {
             QMessageBox::critical(nullptr, QObject::tr("Database Error"), QObject::tr("Could not create writable database."));
             return 1;
         }
-        // Set permissions to ensure the file is writable
         QFile::setPermissions(dbPath, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther);
     }
 
     QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath());
     QCoreApplication::addLibraryPath(QCoreApplication::applicationDirPath() + "/sqldrivers");
-    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE"); // This becomes the default connection
+    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
     db.setDatabaseName(dbPath);
 
     if (!db.open()) {
         QMessageBox::critical(nullptr, QObject::tr("Database Error"), db.lastError().text());
-        qDebug() << "main.cpp - DB Open FAILED:" << db.lastError().text(); // DEBUG
+        qDebug() << "main.cpp - DB Open FAILED:" << db.lastError().text();
         return 1;
     }
-
 
     QSqlQuery q(db);
     q.exec(R"(
@@ -71,7 +78,6 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Course tables
     q.exec(R"(
       CREATE TABLE IF NOT EXISTS courses (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,7 +95,6 @@ int main(int argc, char *argv[]) {
       )
     )");
 
-    // Teams table
     q.exec(R"(
       CREATE TABLE IF NOT EXISTS teams (
         id INTEGER PRIMARY KEY,
@@ -97,8 +102,6 @@ int main(int argc, char *argv[]) {
       )
     )");
 
-
-    // Score Table
     q.exec(R"(
         CREATE TABLE IF NOT EXISTS scores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,7 +114,6 @@ int main(int argc, char *argv[]) {
         )
       )");
 
-    // Settings Table
     q.exec(R"(
         CREATE TABLE IF NOT EXISTS settings (
             key TEXT PRIMARY KEY UNIQUE,
@@ -119,7 +121,7 @@ int main(int argc, char *argv[]) {
         )
       )");
 
-    MainWindow w(db); // Pass the QSqlDatabase object itself
+    MainWindow w(db);
     w.show();
     return app.exec();
 }

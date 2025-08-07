@@ -1,3 +1,8 @@
+/**
+ * @file TeamLeaderboardWidget.h
+ * @brief Contains the declaration of the TeamLeaderboardWidget class.
+ */
+
 #ifndef TEAMLEADERBOARDWIDGET_H
 #define TEAMLEADERBOARDWIDGET_H
 
@@ -6,21 +11,45 @@
 #include <QTableView>
 #include <QVBoxLayout>
 #include <QHeaderView>
-#include "TeamLeaderboardModel.h" // Include the model header
+#include "TeamLeaderboardModel.h"
 
-// Forward declarations for QPainter related classes if used for export
 class QPainter;
 class QImage;
 
+/**
+ * @class TeamLeaderboardWidget
+ * @brief A widget for displaying a team leaderboard.
+ *
+ * This widget contains a table view that displays the data from a
+ * TeamLeaderboardModel. It also provides functionality to refresh the data
+ * and export the leaderboard as an image.
+ */
 class TeamLeaderboardWidget : public QWidget {
     Q_OBJECT
 
 public:
+    /**
+     * @brief Constructs a TeamLeaderboardWidget object.
+     * @param connectionName The name of the database connection to use.
+     * @param parent The parent widget.
+     */
     explicit TeamLeaderboardWidget(const QString &connectionName, QWidget *parent = nullptr);
+
+    /**
+     * @brief Destroys the TeamLeaderboardWidget object.
+     */
     ~TeamLeaderboardWidget();
 
+    /**
+     * @brief Refreshes the leaderboard data.
+     */
     void refreshData();
-    QImage exportToImage() const; // Similar to other leaderboard widgets
+
+    /**
+     * @brief Exports the leaderboard as an image.
+     * @return The leaderboard rendered as a QImage.
+     */
+    QImage exportToImage() const;
 
 private:
     QString m_connectionName;
@@ -29,7 +58,7 @@ private:
 
     QSqlDatabase database() const;
     void configureTableView();
-    void updateColumnVisibility(); // If daily columns need to be hidden
+    void updateColumnVisibility();
 };
 
 #endif // TEAMLEADERBOARDWIDGET_H
