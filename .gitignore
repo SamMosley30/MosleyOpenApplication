@@ -7,9 +7,12 @@ cmake_install.cmake
 Makefile
 MosleyOpen_autogen/
 MosleyOpen
+*.o
+*.o.d
 
 # User-specific files
 *.user
+.vscode/
 
 # Qt Creator files
 *.pro.user
@@ -17,6 +20,11 @@ MosleyOpen
 
 # Log files
 *.log
+app_output.log
 
 # Staging directory
 stage/
+
+# Database files
+tournament.db
+tests/tournament.db
